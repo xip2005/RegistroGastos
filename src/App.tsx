@@ -814,13 +814,13 @@ export default function App() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
-      <header className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Control de Gastos</h1>
-        <div className="no-print flex items-center gap-2">
+    <div className="max-w-4xl mx-auto p-3 sm:p-4 md:p-6 space-y-6">
+      <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Control de Gastos</h1>
+        <div className="no-print flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={exportarBackup}
-            className="bg-slate-100 text-slate-800 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-200 transition"
+            className="bg-slate-100 text-slate-800 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-200 transition text-sm"
             title="Exportar backup"
           >
             <Download size={16} />
@@ -828,7 +828,7 @@ export default function App() {
           </button>
           <button
             onClick={abrirSelectorImportacion}
-            className="bg-slate-100 text-slate-800 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-200 transition"
+            className="bg-slate-100 text-slate-800 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-200 transition text-sm"
             title="Importar backup"
           >
             <Upload size={16} />
@@ -836,18 +836,18 @@ export default function App() {
           </button>
           <button 
             onClick={handlePrint}
-            className="bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-700 transition"
+            className="bg-gray-800 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-700 transition text-sm"
           >
             <Printer size={18} />
-            Imprimir
+            <span className="hidden sm:inline">Imprimir</span>
           </button>
           <button
             onClick={handleLogout}
-            className="bg-red-50 text-red-700 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-red-100 transition"
+            className="bg-red-50 text-red-700 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-red-100 transition text-sm"
             title="Cerrar sesión"
           >
             <LogOut size={16} />
-            Salir
+            <span className="hidden sm:inline">Salir</span>
           </button>
           <input
             ref={backupInputRef}
@@ -859,25 +859,25 @@ export default function App() {
         </div>
       </header>
 
-      <div className="no-print bg-white p-2 rounded-xl border border-gray-100 shadow-sm inline-flex gap-2">
+      <div className="no-print bg-white p-2 rounded-xl border border-gray-100 shadow-sm flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => setVistaActiva('MOVIMIENTOS')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${vistaActiva === 'MOVIMIENTOS' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition flex-1 sm:flex-none ${vistaActiva === 'MOVIMIENTOS' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
         >
           Gastos e Ingresos
         </button>
         <button
           type="button"
           onClick={() => setVistaActiva('AHORRO')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${vistaActiva === 'AHORRO' ? 'bg-sky-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition flex-1 sm:flex-none ${vistaActiva === 'AHORRO' ? 'bg-sky-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
         >
           Ahorro
         </button>
         <button
           type="button"
           onClick={() => setVistaActiva('TARJETA')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${vistaActiva === 'TARJETA' ? 'bg-violet-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition flex-1 sm:flex-none ${vistaActiva === 'TARJETA' ? 'bg-violet-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
         >
           Tarjeta
         </button>
@@ -949,7 +949,7 @@ export default function App() {
 
             <div className="divide-y divide-gray-100 border rounded-lg overflow-hidden">
               {presupuestoPorCategoria.map((item) => (
-                <div key={`presupuesto-${item.categoria.id}`} className="p-3 flex items-center justify-between">
+                <div key={`presupuesto-${item.categoria.id}`} className="p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
                     <div className="font-medium text-gray-800">{item.categoria.nombre}</div>
                     <div className="text-xs text-gray-500">Actual: {formatGsNoDecimals(item.gastoActual)} · Sugerido: {formatGsNoDecimals(item.recomendado)}</div>
@@ -1169,14 +1169,14 @@ export default function App() {
                   const Icon = mov.categorias ? (iconMap[mov.categorias.icono] || <HelpCircle className="w-5 h-5" />) : <HelpCircle className="w-5 h-5" />;
                   
                   return (
-                    <div key={mov.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition">
-                      <div className="flex items-center gap-4">
+                    <div key={mov.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-gray-50 transition">
+                      <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                         <div className={`p-2 rounded-full bg-gray-100`}>
                           {Icon}
                         </div>
-                        <div>
-                          <p className="font-medium text-gray-800">{mov.descripcion}</p>
-                          <div className="flex gap-2 text-xs text-gray-500 mt-0.5">
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-800 break-words">{mov.descripcion}</p>
+                          <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-0.5">
                             <span>{format(new Date(mov.fecha + 'T00:00:00'), 'dd MMM yyyy')}</span>
                             <span>•</span>
                             <span>{mov.categorias?.nombre || 'Sin categoría'}</span>
@@ -1184,7 +1184,7 @@ export default function App() {
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-4">
+                      <div className="w-full sm:w-auto flex items-center justify-end gap-4">
                         <span className={`font-semibold ${mov.tipo === 'INGRESO' ? 'text-emerald-600' : 'text-gray-800'}`}>
                           {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGs(mov.monto)}
                         </span>
@@ -1434,12 +1434,12 @@ export default function App() {
               ) : (
                 <div className="divide-y divide-gray-100">
                   {historialAhorro.map((mov) => (
-                    <div key={`ahorro-${mov.id}`} className="p-4 flex items-center justify-between">
+                    <div key={`ahorro-${mov.id}`} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
                         <p className="font-medium text-gray-800">{mov.descripcion}</p>
                         <p className="text-xs text-gray-500">{format(new Date(mov.fecha + 'T00:00:00'), 'dd/MM/yyyy')}</p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="w-full sm:w-auto flex items-center justify-end gap-3">
                         <span className={`font-semibold ${mov.tipo === 'INGRESO' ? 'text-sky-700' : 'text-amber-700'}`}>
                           {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGs(mov.monto)}
                         </span>
@@ -1607,12 +1607,12 @@ export default function App() {
               ) : (
                 <div className="divide-y divide-gray-100">
                   {movimientosTarjetaMes.map((mov) => (
-                    <div key={mov.id} className="p-4 flex items-center justify-between">
+                    <div key={mov.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
                         <p className="font-medium text-gray-800">{mov.descripcion}</p>
                         <p className="text-xs text-gray-500">{format(new Date(mov.fecha + 'T00:00:00'), 'dd/MM/yyyy')}</p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="w-full sm:w-auto flex items-center justify-end gap-3">
                         <span className={`font-semibold ${mov.tipo === 'GASTO' ? 'text-red-700' : 'text-emerald-700'}`}>
                           {mov.tipo === 'GASTO' ? '+' : '-'}{formatGs(mov.monto)}
                         </span>
