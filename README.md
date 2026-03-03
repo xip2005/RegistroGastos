@@ -16,6 +16,7 @@ npm run dev
 Para publicar y usar la app desde cualquier PC sin copiar archivos, sigue:
 
 - [DEPLOY_GITHUB_VERCEL.md](DEPLOY_GITHUB_VERCEL.md)
+- [PLAN_EMERGENCIA_SUPABASE.md](PLAN_EMERGENCIA_SUPABASE.md)
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
