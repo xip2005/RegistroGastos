@@ -1365,7 +1365,7 @@ export default function App() {
                       const Icon = mov.categorias ? (iconMap[mov.categorias.icono] || <HelpCircle className="w-5 h-5" />) : <HelpCircle className="w-5 h-5" />;
 
                       return (
-                        <div key={mov.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:hover:bg-gray-50 transition">
+                        <div key={mov.id} className="p-4 sm:hover:bg-gray-50 transition">
                           <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                             <div className={`p-2 rounded-full bg-gray-100`}>
                               {Icon}
@@ -1380,31 +1380,33 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2 sm:gap-4 flex-nowrap">
+                          <div className="mt-2 flex items-center justify-between gap-2">
                             <span className={`font-semibold shrink-0 whitespace-nowrap text-sm sm:text-base ${mov.tipo === 'INGRESO' ? 'text-emerald-600' : 'text-gray-800'}`}>
                               {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGs(mov.monto)}
                             </span>
-                            <button
-                              onClick={() => moverMovimientoAAhorro(mov)}
-                              className="text-gray-400 hover:text-sky-600 p-1 no-print shrink-0"
-                              title="Mover a ahorro"
-                            >
-                              <PiggyBank size={16} />
-                            </button>
-                            <button
-                              onClick={() => editarDescripcionMovimiento(mov)}
-                              className="text-gray-400 hover:text-blue-600 p-1 no-print shrink-0"
-                              title="Editar observación"
-                            >
-                              <Pencil size={16} />
-                            </button>
-                            <button
-                              onClick={() => eliminarMovimiento(mov.id)}
-                              className="text-gray-400 hover:text-red-500 p-1 no-print shrink-0"
-                              title="Eliminar"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <div className="flex items-center gap-2 shrink-0 no-print">
+                              <button
+                                onClick={() => moverMovimientoAAhorro(mov)}
+                                className="text-gray-400 hover:text-sky-600 p-1 shrink-0"
+                                title="Mover a ahorro"
+                              >
+                                <PiggyBank size={16} />
+                              </button>
+                              <button
+                                onClick={() => editarDescripcionMovimiento(mov)}
+                                className="text-gray-400 hover:text-blue-600 p-1 shrink-0"
+                                title="Editar observación"
+                              >
+                                <Pencil size={16} />
+                              </button>
+                              <button
+                                onClick={() => eliminarMovimiento(mov.id)}
+                                className="text-gray-400 hover:text-red-500 p-1 shrink-0"
+                                title="Eliminar"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -1638,29 +1640,31 @@ export default function App() {
               ) : (
                 <div className="divide-y divide-gray-100">
                   {historialAhorro.map((mov) => (
-                    <div key={`ahorro-${mov.id}`} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div key={`ahorro-${mov.id}`} className="p-4">
                       <div>
                         <p className="font-medium text-gray-800">{mov.descripcion}</p>
                         <p className="text-xs text-gray-500">{format(new Date(mov.fecha + 'T00:00:00'), 'dd/MM/yyyy')}</p>
                       </div>
-                      <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-nowrap">
+                      <div className="mt-2 flex items-center justify-between gap-2">
                         <span className={`font-semibold shrink-0 whitespace-nowrap text-sm sm:text-base ${mov.tipo === 'INGRESO' ? 'text-sky-700' : 'text-amber-700'}`}>
                           {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGs(mov.monto)}
                         </span>
-                        <button
-                          onClick={() => editarDescripcionMovimiento(mov)}
-                          className="text-gray-400 hover:text-blue-600 p-1 no-print shrink-0"
-                          title="Editar observación"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          onClick={() => eliminarMovimiento(mov.id)}
-                          className="text-gray-400 hover:text-red-500 p-1 no-print shrink-0"
-                          title="Eliminar movimiento de ahorro"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center gap-2 no-print shrink-0">
+                          <button
+                            onClick={() => editarDescripcionMovimiento(mov)}
+                            className="text-gray-400 hover:text-blue-600 p-1 shrink-0"
+                            title="Editar observación"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            onClick={() => eliminarMovimiento(mov.id)}
+                            className="text-gray-400 hover:text-red-500 p-1 shrink-0"
+                            title="Eliminar movimiento de ahorro"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1820,29 +1824,31 @@ export default function App() {
               ) : (
                 <div className="divide-y divide-gray-100">
                   {movimientosTarjetaMes.map((mov) => (
-                    <div key={mov.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div key={mov.id} className="p-4">
                       <div>
                         <p className="font-medium text-gray-800">{mov.descripcion}</p>
                         <p className="text-xs text-gray-500">{format(new Date(mov.fecha + 'T00:00:00'), 'dd/MM/yyyy')}</p>
                       </div>
-                      <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-nowrap">
+                      <div className="mt-2 flex items-center justify-between gap-2">
                         <span className={`font-semibold shrink-0 whitespace-nowrap text-sm sm:text-base ${mov.tipo === 'GASTO' ? 'text-red-700' : 'text-emerald-700'}`}>
                           {mov.tipo === 'GASTO' ? '+' : '-'}{formatGs(mov.monto)}
                         </span>
-                        <button
-                          onClick={() => editarDescripcionMovimientoTarjeta(mov.id, mov.descripcion)}
-                          className="text-gray-400 hover:text-blue-600 p-1 shrink-0"
-                          title="Editar observación"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          onClick={() => eliminarMovimientoTarjeta(mov.id)}
-                          className="text-gray-400 hover:text-red-500 p-1 shrink-0"
-                          title="Eliminar movimiento de tarjeta"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => editarDescripcionMovimientoTarjeta(mov.id, mov.descripcion)}
+                            className="text-gray-400 hover:text-blue-600 p-1 shrink-0"
+                            title="Editar observación"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            onClick={() => eliminarMovimientoTarjeta(mov.id)}
+                            className="text-gray-400 hover:text-red-500 p-1 shrink-0"
+                            title="Eliminar movimiento de tarjeta"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
