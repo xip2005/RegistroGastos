@@ -270,6 +270,7 @@ export default function App() {
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminProcesando, setAdminProcesando] = useState(false);
   const [adminMesesRenovacion, setAdminMesesRenovacion] = useState('1');
+  const [adminClavesGeneradas, setAdminClavesGeneradas] = useState<Record<string, string>>({});
   const [adminNuevoUsuario, setAdminNuevoUsuario] = useState('');
   const [adminNuevoPassword, setAdminNuevoPassword] = useState('');
   const [adminNuevoMeses, setAdminNuevoMeses] = useState('1');
@@ -948,6 +949,26 @@ export default function App() {
     return Number.isNaN(parsed) ? 1 : Math.max(parsed, 1);
   }
 
+  function claveUsuarioKey(usuario: string) {
+    return usuario.trim().toLowerCase();
+  }
+
+  function guardarClaveGenerada(usuario: string, clave: string) {
+    setAdminClavesGeneradas((prev) => ({
+      ...prev,
+      [claveUsuarioKey(usuario)]: clave,
+    }));
+  }
+
+  async function copiarTexto(texto: string) {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(texto);
+      return true;
+    }
+
+    return false;
+  }
+
   async function cargarUsuariosAdmin() {
     if (!isAdmin) {
       return;
@@ -999,9 +1020,8 @@ export default function App() {
       return;
     }
 
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(`${usuario}: ${nuevaClave}`);
-    }
+    guardarClaveGenerada(usuario, nuevaClave);
+    await copiarTexto(`${usuario}: ${nuevaClave}`);
 
     alert(`Renovado ${usuario} por ${meses} mes(es).\nClave nueva: ${nuevaClave}\nSe copió al portapapeles.`);
     await cargarUsuariosAdmin();
@@ -1068,12 +1088,13 @@ export default function App() {
       if (error || data !== true) {
         lineasError.push(usuario.usuario);
       } else {
+        guardarClaveGenerada(usuario.usuario, nuevaClave);
         lineasExito.push(`${usuario.usuario}: ${nuevaClave}`);
       }
     }
 
-    if (lineasExito.length > 0 && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(lineasExito.join('\n'));
+    if (lineasExito.length > 0) {
+      await copiarTexto(lineasExito.join('\n'));
     }
 
     await cargarUsuariosAdmin();
@@ -1136,9 +1157,8 @@ export default function App() {
       return;
     }
 
-    if (payload.clave_mensual && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(`${payload.usuario}: ${payload.clave_mensual}`);
-    }
+    guardarClaveGenerada(payload.usuario, payload.clave_mensual);
+    await copiarTexto(`${payload.usuario}: ${payload.clave_mensual}`);
 
     alert(`Usuario creado: ${payload.usuario}\nClave mensual: ${payload.clave_mensual}\nSe copió al portapapeles.`);
 
@@ -2351,6 +2371,21 @@ export default function App() {
                         {!usuario.activo && <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-700">INACTIVO</span>}
                       </div>
                     </div>
+
+                    {adminClavesGeneradas[claveUsuarioKey(usuario.usuario)] && (
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-sm text-emerald-800">
+                          Última clave generada: <span className="font-semibold">{adminClavesGeneradas[claveUsuarioKey(usuario.usuario)]}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copiarTexto(`${usuario.usuario}: ${adminClavesGeneradas[claveUsuarioKey(usuario.usuario)]}`)}
+                          className="px-2 py-1 rounded border border-emerald-300 text-emerald-700 text-xs hover:bg-emerald-100"
+                        >
+                          Copiar
+                        </button>
+                      </div>
+                    )}
 
                     <div className="flex flex-wrap gap-2">
                       <button
