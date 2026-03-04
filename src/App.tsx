@@ -77,6 +77,8 @@ type MovimientoTarjeta = {
 type BackupPayload = {
   version: 1;
   exportedAt: string;
+  exportedByUserId?: string;
+  exportedByUsuario?: string;
   categorias: Array<{
     id: string;
     nombre: string;
@@ -914,6 +916,8 @@ export default function App() {
     const payload: BackupPayload = {
       version: 1,
       exportedAt: new Date().toISOString(),
+      exportedByUserId: authUserId,
+      exportedByUsuario: authUsuario,
       categorias: categoriasData ?? [],
       movimientos: movimientosData ?? [],
       tarjeta: {
@@ -956,6 +960,23 @@ export default function App() {
       if (!Array.isArray(backup.categorias) || !Array.isArray(backup.movimientos)) {
         alert('Archivo de backup inválido.');
         return;
+      }
+
+      if (backup.exportedByUserId && backup.exportedByUserId !== authUserId) {
+        const usuarioOrigen = backup.exportedByUsuario?.trim();
+        const mensajeUsuario = usuarioOrigen ? ` (${usuarioOrigen})` : '';
+        alert(`Este backup pertenece a otro usuario${mensajeUsuario}. Inicia sesión con ese usuario para importarlo.`);
+        return;
+      }
+
+      if (!backup.exportedByUserId) {
+        const confirmarBackupAntiguo = confirm(
+          'Este backup es de una versión anterior y no indica usuario de origen. Se importará en el usuario actual. ¿Continuar?',
+        );
+
+        if (!confirmarBackupAntiguo) {
+          return;
+        }
       }
 
       const confirmar = confirm('Esto fusionará datos del backup con tu base actual. ¿Continuar?');
