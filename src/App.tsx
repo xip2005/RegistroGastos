@@ -1380,10 +1380,12 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="mt-2 flex items-center justify-between gap-2">
-                            <span className={`font-semibold shrink-0 whitespace-nowrap text-sm sm:text-base ${mov.tipo === 'INGRESO' ? 'text-emerald-600' : 'text-gray-800'}`}>
-                              {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGs(mov.monto)}
-                            </span>
+                          <div className="mt-2 grid grid-cols-[1fr_auto] items-center gap-2">
+                            <div className="min-w-0">
+                              <span className={`block font-semibold whitespace-nowrap overflow-hidden text-ellipsis text-sm sm:text-base ${mov.tipo === 'INGRESO' ? 'text-emerald-600' : 'text-gray-800'}`}>
+                                {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGsNoDecimals(mov.monto)}
+                              </span>
+                            </div>
                             <div className="flex items-center gap-2 shrink-0 no-print">
                               <button
                                 onClick={() => moverMovimientoAAhorro(mov)}
@@ -1645,10 +1647,12 @@ export default function App() {
                         <p className="font-medium text-gray-800">{mov.descripcion}</p>
                         <p className="text-xs text-gray-500">{format(new Date(mov.fecha + 'T00:00:00'), 'dd/MM/yyyy')}</p>
                       </div>
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className={`font-semibold shrink-0 whitespace-nowrap text-sm sm:text-base ${mov.tipo === 'INGRESO' ? 'text-sky-700' : 'text-amber-700'}`}>
-                          {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGs(mov.monto)}
-                        </span>
+                      <div className="mt-2 grid grid-cols-[1fr_auto] items-center gap-2">
+                        <div className="min-w-0">
+                          <span className={`block font-semibold whitespace-nowrap overflow-hidden text-ellipsis text-sm sm:text-base ${mov.tipo === 'INGRESO' ? 'text-sky-700' : 'text-amber-700'}`}>
+                            {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGsNoDecimals(mov.monto)}
+                          </span>
+                        </div>
                         <div className="flex items-center gap-2 no-print shrink-0">
                           <button
                             onClick={() => editarDescripcionMovimiento(mov)}
@@ -1829,10 +1833,12 @@ export default function App() {
                         <p className="font-medium text-gray-800">{mov.descripcion}</p>
                         <p className="text-xs text-gray-500">{format(new Date(mov.fecha + 'T00:00:00'), 'dd/MM/yyyy')}</p>
                       </div>
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className={`font-semibold shrink-0 whitespace-nowrap text-sm sm:text-base ${mov.tipo === 'GASTO' ? 'text-red-700' : 'text-emerald-700'}`}>
-                          {mov.tipo === 'GASTO' ? '+' : '-'}{formatGs(mov.monto)}
-                        </span>
+                      <div className="mt-2 grid grid-cols-[1fr_auto] items-center gap-2">
+                        <div className="min-w-0">
+                          <span className={`block font-semibold whitespace-nowrap overflow-hidden text-ellipsis text-sm sm:text-base ${mov.tipo === 'GASTO' ? 'text-red-700' : 'text-emerald-700'}`}>
+                            {mov.tipo === 'GASTO' ? '+' : '-'}{formatGsNoDecimals(mov.monto)}
+                          </span>
+                        </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <button
                             onClick={() => editarDescripcionMovimientoTarjeta(mov.id, mov.descripcion)}
