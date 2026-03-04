@@ -277,6 +277,7 @@ export default function App() {
   const [tarjetaFecha, setTarjetaFecha] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [mesTarjeta, setMesTarjeta] = useState(format(new Date(), 'yyyy-MM'));
   const [tarjetaCargada, setTarjetaCargada] = useState(false);
+  const [tarjetaCargadaUsuarioId, setTarjetaCargadaUsuarioId] = useState<string | null>(null);
   const [resumenCierreMes, setResumenCierreMes] = useState<null | {
     mes: string;
     gastos: number;
@@ -325,6 +326,7 @@ export default function App() {
     }
 
     setTarjetaCargada(false);
+    setTarjetaCargadaUsuarioId(null);
     setDeudaInicialTarjeta('');
     setLimiteTarjeta('');
     setMovimientosTarjeta([]);
@@ -335,7 +337,7 @@ export default function App() {
   }, [isAuthenticated, authUserId]);
 
   useEffect(() => {
-    if (!isAuthenticated || !authUserId || !tarjetaCargada) {
+    if (!isAuthenticated || !authUserId || !tarjetaCargada || tarjetaCargadaUsuarioId !== authUserId) {
       return;
     }
 
@@ -361,7 +363,7 @@ export default function App() {
     };
 
     void guardar();
-  }, [isAuthenticated, authUserId, tarjetaCargada, deudaInicialTarjeta, limiteTarjeta]);
+  }, [isAuthenticated, authUserId, tarjetaCargada, tarjetaCargadaUsuarioId, deudaInicialTarjeta, limiteTarjeta]);
 
   useEffect(() => {
     if (!isAuthenticated || !authUserId) {
@@ -376,6 +378,7 @@ export default function App() {
       setDeudaInicialTarjeta('');
       setLimiteTarjeta('');
       setMovimientosTarjeta([]);
+      setTarjetaCargadaUsuarioId(null);
       setTarjetaCargada(true);
       return;
     }
@@ -406,6 +409,7 @@ export default function App() {
     }
 
     setMovimientosTarjeta((movimientosData ?? []) as MovimientoTarjeta[]);
+    setTarjetaCargadaUsuarioId(authUserId);
     setTarjetaCargada(true);
   }
 
@@ -517,6 +521,8 @@ export default function App() {
     setMovimientos([]);
     setHistorialAhorro([]);
     setMovimientosTarjeta([]);
+    setTarjetaCargadaUsuarioId(null);
+    setTarjetaCargada(false);
     setUsuariosAdmin([]);
     setAdminError('');
     setVistaActiva('MOVIMIENTOS');
