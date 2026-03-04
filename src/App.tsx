@@ -1711,18 +1711,18 @@ export default function App() {
           <button
             onClick={exportarBackup}
             className="bg-slate-100 text-slate-800 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-200 transition text-sm"
-            title="Exportar backup"
+            title="Guardar datos"
           >
             <Download size={16} />
-            Exportar
+            Guardar datos
           </button>
           <button
             onClick={abrirSelectorImportacion}
             className="bg-slate-100 text-slate-800 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-200 transition text-sm"
-            title="Importar backup"
+            title="Traer datos"
           >
             <Upload size={16} />
-            Importar
+            Traer datos
           </button>
           <button 
             onClick={handlePrint}
@@ -1737,7 +1737,7 @@ export default function App() {
             title="Ayuda rápida"
           >
             <HelpCircle size={16} />
-            Soporte
+            Ayuda rápida
           </button>
           <button
             onClick={handleLogout}
@@ -1805,21 +1805,49 @@ export default function App() {
               </button>
             </div>
             <div className="space-y-3 text-sm text-gray-700">
-              <p className="text-gray-600">Pasos simples para usar la app:</p>
-              <ol className="list-decimal pl-5 space-y-2">
-                <li>
-                  Para registrar un gasto o ingreso, toca <span className="font-semibold">Nuevo registro</span> (botón azul flotante).
-                </li>
-                <li>
-                  Para cargar tu salario, ve a <span className="font-semibold">Presupuesto sugerido</span> y completa <span className="font-semibold">Salario mensual (ingreso base)</span>.
-                </li>
-                <li>
-                  Usa las pestañas <span className="font-semibold">Gastos e Ingresos</span>, <span className="font-semibold">Ahorro</span> y <span className="font-semibold">Tarjeta</span> para cada tipo de control.
-                </li>
-                <li>
-                  Para respaldo, usa <span className="font-semibold">Exportar</span> y <span className="font-semibold">Importar</span> arriba.
-                </li>
-              </ol>
+              <p className="text-gray-600">Guía rápida por pestaña:</p>
+
+              <div className="rounded-lg border border-gray-100 p-3 bg-gray-50">
+                <div className="font-semibold text-gray-900 mb-1">Gastos e Ingresos</div>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Toca <span className="font-semibold">Nuevo registro</span> para cargar un movimiento.</li>
+                  <li>Elige <span className="font-semibold">Gasto</span> o <span className="font-semibold">Ingreso</span>, completa los campos y guarda.</li>
+                  <li>En <span className="font-semibold">Presupuesto sugerido</span> puedes cargar <span className="font-semibold">Salario mensual (ingreso base)</span>.</li>
+                </ul>
+              </div>
+
+              <div className="rounded-lg border border-gray-100 p-3 bg-gray-50">
+                <div className="font-semibold text-gray-900 mb-1">Ahorro</div>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Selecciona <span className="font-semibold">Ahorro</span> o <span className="font-semibold">Retiro</span>.</li>
+                  <li>Carga monto, descripción y fecha para registrar el movimiento.</li>
+                </ul>
+              </div>
+
+              <div className="rounded-lg border border-gray-100 p-3 bg-gray-50">
+                <div className="font-semibold text-gray-900 mb-1">Tarjeta</div>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Configura <span className="font-semibold">Deuda inicial</span> y <span className="font-semibold">Límite</span>.</li>
+                  <li>Registra <span className="font-semibold">Gasto tarjeta</span> o <span className="font-semibold">Pago tarjeta</span>.</li>
+                  <li>Revisa historial por mes y usa <span className="font-semibold">Cerrar mes</span> si necesitas resumen.</li>
+                </ul>
+              </div>
+
+              {isAdmin && (
+                <div className="rounded-lg border border-gray-100 p-3 bg-gray-50">
+                  <div className="font-semibold text-gray-900 mb-1">Admin</div>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Crea usuarios nuevos y genera su clave mensual.</li>
+                    <li>Renueva mensualidad, marca moroso o elimina usuario.</li>
+                  </ul>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-slate-200 p-3">
+                <div className="font-semibold text-gray-900 mb-1">Respaldo</div>
+                <p>Usa <span className="font-semibold">Exportar</span> para guardar copia y <span className="font-semibold">Importar</span> para recuperar datos.</p>
+              </div>
+
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-800">
                 Si algo no te deja avanzar, cerrá sesión y entrá de nuevo. Si continúa, contactá al administrador.
               </div>
