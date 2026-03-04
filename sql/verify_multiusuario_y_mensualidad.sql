@@ -1,0 +1,27 @@
+-- 1) Verifica columnas nuevas en usuarios
+select column_name, data_type
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'fin_usuarios'
+  and column_name in ('estado_pago', 'clave_mensual_hash', 'updated_at')
+order by column_name;
+
+-- 2) Verifica columna usuario_id en movimientos
+select column_name, data_type
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'fin_movimientos'
+  and column_name = 'usuario_id';
+
+-- 3) Verifica función de login multi
+select
+  n.nspname as schema,
+  p.proname as function_name,
+  pg_get_function_identity_arguments(p.oid) as args
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname = 'fin_login_multi';
+
+-- 4) Prueba login multi (reemplaza por usuario real y clave mensual real)
+-- select * from public.fin_login_multi('Admin', 'pablo123', 'TU-CLAVE-MENSUAL');

@@ -13,6 +13,15 @@ npm install
 npm run dev
 ```
 
+## Activar multiusuario + clave mensual
+
+En Supabase SQL Editor, ejecuta:
+
+1. `sql/setup_fin_movimientos.sql` (si aún no lo corriste)
+2. `sql/setup_fin_usuarios.sql` (si aún no lo corriste)
+3. `sql/setup_multiusuario_y_mensualidad.sql`
+4. `sql/verify_multiusuario_y_mensualidad.sql` (verificación)
+
 Para publicar y usar la app desde cualquier PC sin copiar archivos, sigue:
 
 - [DEPLOY_GITHUB_VERCEL.md](DEPLOY_GITHUB_VERCEL.md)

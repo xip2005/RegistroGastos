@@ -34,6 +34,7 @@ type Movimiento = {
   fecha: string;
   tipo: 'INGRESO' | 'GASTO';
   categoria_id: string;
+  usuario_id: string;
   categorias?: Categoria; // Relación desde Supabase
 };
 
@@ -43,11 +44,25 @@ type VistaPrincipal = 'MOVIMIENTOS' | 'AHORRO' | 'TARJETA';
 type TarjetaTipo = 'GASTO' | 'PAGO';
 const MOVIMIENTOS_TABLE = 'fin_movimientos';
 const SESSION_KEY = 'registrogastos_auth';
-const LOGIN_RPC = 'fin_login';
+const LOGIN_RPC = 'fin_login_multi';
 const DEUDA_INICIAL_TARJETA_KEY = 'registrogastos_deuda_inicial_tarjeta';
 const LIMITE_TARJETA_KEY = 'registrogastos_limite_tarjeta';
 const MOVIMIENTOS_TARJETA_KEY = 'registrogastos_movimientos_tarjeta';
 const PRESUPUESTO_INGRESO_BASE_KEY = 'registrogastos_presupuesto_ingreso_base';
+
+type AuthSession = {
+  ok: true;
+  userId: string;
+  usuario: string;
+};
+
+type LoginRpcResponse = {
+  ok: boolean;
+  user_id: string | null;
+  usuario: string | null;
+  estado_pago: string | null;
+  mensaje: string | null;
+};
 
 type MovimientoTarjeta = {
   id: string;
@@ -72,6 +87,7 @@ type BackupPayload = {
     fecha: string;
     tipo: 'INGRESO' | 'GASTO';
     categoria_id: string;
+    usuario_id?: string;
   }>;
   tarjeta?: {
     deudaInicial: string;
@@ -135,10 +151,41 @@ function parseGsInputToNumber(value: string) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function readAuthSession(): AuthSession | null {
+  const raw = sessionStorage.getItem(SESSION_KEY);
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<AuthSession>;
+    if (parsed.ok === true && typeof parsed.userId === 'string' && parsed.userId && typeof parsed.usuario === 'string') {
+      return {
+        ok: true,
+        userId: parsed.userId,
+        usuario: parsed.usuario,
+      };
+    }
+  } catch {
+    sessionStorage.removeItem(SESSION_KEY);
+  }
+
+  return null;
+}
+
+function getScopedStorageKey(baseKey: string, userId: string) {
+  return `${baseKey}:${userId}`;
+}
+
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem(SESSION_KEY) === 'ok');
+  const [authSession, setAuthSession] = useState<AuthSession | null>(() => readAuthSession());
+  const [isAuthenticated, setIsAuthenticated] = useState(() => readAuthSession() !== null);
+  const authUserId = authSession?.userId ?? null;
+  const authUsuario = authSession?.usuario ?? '';
   const [loginUser, setLoginUser] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [loginMonthlyKey, setLoginMonthlyKey] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -160,28 +207,10 @@ export default function App() {
   const [filtroTipoHistorial, setFiltroTipoHistorial] = useState<FiltroTipoHistorial>('TODOS');
   const [saldoReal, setSaldoReal] = useState('');
   const [mostrarModalMovimiento, setMostrarModalMovimiento] = useState(false);
-  const [presupuestoIngresoBase, setPresupuestoIngresoBase] = useState(
-    () => localStorage.getItem(PRESUPUESTO_INGRESO_BASE_KEY) ?? '',
-  );
-  const [deudaInicialTarjeta, setDeudaInicialTarjeta] = useState(
-    () => localStorage.getItem(DEUDA_INICIAL_TARJETA_KEY) ?? '1.997.217',
-  );
-  const [limiteTarjeta, setLimiteTarjeta] = useState(
-    () => localStorage.getItem(LIMITE_TARJETA_KEY) ?? '2.200.000',
-  );
-  const [movimientosTarjeta, setMovimientosTarjeta] = useState<MovimientoTarjeta[]>(() => {
-    const raw = localStorage.getItem(MOVIMIENTOS_TARJETA_KEY);
-    if (!raw) {
-      return [];
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as MovimientoTarjeta[];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  });
+  const [presupuestoIngresoBase, setPresupuestoIngresoBase] = useState('');
+  const [deudaInicialTarjeta, setDeudaInicialTarjeta] = useState('1.997.217');
+  const [limiteTarjeta, setLimiteTarjeta] = useState('2.200.000');
+  const [movimientosTarjeta, setMovimientosTarjeta] = useState<MovimientoTarjeta[]>([]);
   const [tarjetaTipo, setTarjetaTipo] = useState<TarjetaTipo>('GASTO');
   const [tarjetaMonto, setTarjetaMonto] = useState('');
   const [tarjetaDescripcion, setTarjetaDescripcion] = useState('');
@@ -203,53 +232,80 @@ export default function App() {
   const backupInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !authUserId) {
       return;
     }
 
     cargarCategorias();
     cargarMovimientos();
-  }, [isAuthenticated, fechaInicio, fechaFin]);
+  }, [isAuthenticated, authUserId, fechaInicio, fechaFin]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !authUserId) {
       return;
     }
 
     cargarHistorialAhorro();
-  }, [isAuthenticated, categorias, fechaAhorroInicio, fechaAhorroFin]);
+  }, [isAuthenticated, authUserId, categorias, fechaAhorroInicio, fechaAhorroFin]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !authUserId) {
       return;
     }
 
-    localStorage.setItem(DEUDA_INICIAL_TARJETA_KEY, deudaInicialTarjeta);
-  }, [isAuthenticated, deudaInicialTarjeta]);
+    const deudaGuardada = localStorage.getItem(getScopedStorageKey(DEUDA_INICIAL_TARJETA_KEY, authUserId));
+    const limiteGuardado = localStorage.getItem(getScopedStorageKey(LIMITE_TARJETA_KEY, authUserId));
+    const presupuestoGuardado = localStorage.getItem(getScopedStorageKey(PRESUPUESTO_INGRESO_BASE_KEY, authUserId));
+    const movimientosTarjetaGuardados = localStorage.getItem(getScopedStorageKey(MOVIMIENTOS_TARJETA_KEY, authUserId));
 
-  useEffect(() => {
-    if (!isAuthenticated) {
+    setDeudaInicialTarjeta(deudaGuardada ?? '1.997.217');
+    setLimiteTarjeta(limiteGuardado ?? '2.200.000');
+    setPresupuestoIngresoBase(presupuestoGuardado ?? '');
+
+    if (!movimientosTarjetaGuardados) {
+      setMovimientosTarjeta([]);
       return;
     }
 
-    localStorage.setItem(LIMITE_TARJETA_KEY, limiteTarjeta);
-  }, [isAuthenticated, limiteTarjeta]);
+    try {
+      const parsed = JSON.parse(movimientosTarjetaGuardados) as MovimientoTarjeta[];
+      setMovimientosTarjeta(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setMovimientosTarjeta([]);
+    }
+  }, [isAuthenticated, authUserId]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !authUserId) {
       return;
     }
 
-    localStorage.setItem(MOVIMIENTOS_TARJETA_KEY, JSON.stringify(movimientosTarjeta));
-  }, [isAuthenticated, movimientosTarjeta]);
+    localStorage.setItem(getScopedStorageKey(DEUDA_INICIAL_TARJETA_KEY, authUserId), deudaInicialTarjeta);
+  }, [isAuthenticated, authUserId, deudaInicialTarjeta]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !authUserId) {
       return;
     }
 
-    localStorage.setItem(PRESUPUESTO_INGRESO_BASE_KEY, presupuestoIngresoBase);
-  }, [isAuthenticated, presupuestoIngresoBase]);
+    localStorage.setItem(getScopedStorageKey(LIMITE_TARJETA_KEY, authUserId), limiteTarjeta);
+  }, [isAuthenticated, authUserId, limiteTarjeta]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !authUserId) {
+      return;
+    }
+
+    localStorage.setItem(getScopedStorageKey(MOVIMIENTOS_TARJETA_KEY, authUserId), JSON.stringify(movimientosTarjeta));
+  }, [isAuthenticated, authUserId, movimientosTarjeta]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !authUserId) {
+      return;
+    }
+
+    localStorage.setItem(getScopedStorageKey(PRESUPUESTO_INGRESO_BASE_KEY, authUserId), presupuestoIngresoBase);
+  }, [isAuthenticated, authUserId, presupuestoIngresoBase]);
 
   function obtenerMensajeErrorLogin(error: {
     message: string;
@@ -263,7 +319,7 @@ export default function App() {
       .toLowerCase();
 
     if (error.code === 'PGRST202' || textoError.includes(LOGIN_RPC)) {
-      return 'Falta crear login en DB. Ejecuta sql/setup_fin_usuarios.sql en Supabase.';
+      return 'Falta crear login multiusuario en DB. Ejecuta sql/setup_multiusuario_y_mensualidad.sql en Supabase.';
     }
 
     if (textoError.includes('permission denied') || textoError.includes('not allowed')) {
@@ -281,6 +337,7 @@ export default function App() {
     const { data, error } = await supabase.rpc(LOGIN_RPC, {
       p_usuario: loginUser,
       p_password: loginPassword,
+      p_clave_mensual: loginMonthlyKey,
     });
 
     if (error) {
@@ -289,30 +346,50 @@ export default function App() {
       return;
     }
 
-    if (data === true) {
-      sessionStorage.setItem(SESSION_KEY, 'ok');
+    const payload = (Array.isArray(data) ? data[0] : data) as LoginRpcResponse | null;
+
+    if (payload?.ok && payload.user_id) {
+      const sessionData: AuthSession = {
+        ok: true,
+        userId: payload.user_id,
+        usuario: payload.usuario ?? loginUser,
+      };
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+      setAuthSession(sessionData);
       setIsAuthenticated(true);
       setLoginError('');
       setLoginPassword('');
+      setLoginMonthlyKey('');
       setLoginLoading(false);
       return;
     }
 
-    setLoginError('Usuario o contraseña incorrectos.');
+    setLoginError(payload?.mensaje || 'Usuario, contraseña o clave mensual incorrectos.');
     setLoginLoading(false);
   }
 
   function handleLogout() {
     sessionStorage.removeItem(SESSION_KEY);
+    setAuthSession(null);
     setIsAuthenticated(false);
+    setMovimientos([]);
+    setHistorialAhorro([]);
+    setMovimientosTarjeta([]);
     setLoginUser('');
     setLoginPassword('');
+    setLoginMonthlyKey('');
     setLoginError('');
   }
 
   function mostrarErrorSupabase(errorMessage: string) {
     if (errorMessage.includes(`Could not find the table 'public.${MOVIMIENTOS_TABLE}'`)) {
       alert(`Falta crear la tabla ${MOVIMIENTOS_TABLE} en Supabase. Ejecuta el script SQL que te dejé en sql/setup_fin_movimientos.sql y vuelve a intentar.`);
+      return;
+    }
+
+    const texto = errorMessage.toLowerCase();
+    if (texto.includes('usuario_id') || texto.includes('fin_login_multi')) {
+      alert('Falta migración multiusuario. Ejecuta sql/setup_multiusuario_y_mensualidad.sql y vuelve a intentar.');
       return;
     }
 
@@ -334,9 +411,15 @@ export default function App() {
   }
 
   async function cargarMovimientos() {
+    if (!authUserId) {
+      setMovimientos([]);
+      return;
+    }
+
     const { data, error } = await supabase
       .from(MOVIMIENTOS_TABLE)
       .select('*, categorias:fin_categorias(*)')
+      .eq('usuario_id', authUserId)
       .gte('fecha', fechaInicio)
       .lte('fecha', fechaFin)
       .order('fecha', { ascending: false });
@@ -350,6 +433,11 @@ export default function App() {
   }
 
   async function cargarHistorialAhorro() {
+    if (!authUserId) {
+      setHistorialAhorro([]);
+      return;
+    }
+
     const categoriaAhorro = obtenerCategoriaAhorro();
 
     if (!categoriaAhorro) {
@@ -360,6 +448,7 @@ export default function App() {
     const { data, error } = await supabase
       .from(MOVIMIENTOS_TABLE)
       .select('*, categorias:fin_categorias(*)')
+      .eq('usuario_id', authUserId)
       .eq('categoria_id', categoriaAhorro.id)
       .gte('fecha', fechaAhorroInicio)
       .lte('fecha', fechaAhorroFin)
@@ -375,6 +464,11 @@ export default function App() {
 
   async function guardarMovimiento(e: React.FormEvent) {
     e.preventDefault();
+    if (!authUserId) {
+      alert('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
+
     const montoNormalizado = parseGsInputToNumber(monto);
     if (!monto || Number.isNaN(montoNormalizado) || montoNormalizado <= 0) {
       return alert('El monto debe ser mayor a 0');
@@ -385,7 +479,8 @@ export default function App() {
       descripcion,
       tipo,
       categoria_id: categoriaId,
-      fecha
+      fecha,
+      usuario_id: authUserId,
     }]);
 
     if (error) {
@@ -401,6 +496,11 @@ export default function App() {
 
   async function guardarAhorro(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!authUserId) {
+      alert('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
 
     const categoriaAhorro = obtenerCategoriaAhorro();
 
@@ -422,6 +522,7 @@ export default function App() {
         tipo: ahorroOperacion === 'AHORRO' ? 'INGRESO' : 'GASTO',
         categoria_id: categoriaAhorro.id,
         fecha: ahorroFecha,
+        usuario_id: authUserId,
       },
     ]);
 
@@ -438,8 +539,17 @@ export default function App() {
   }
 
   async function eliminarMovimiento(id: string) {
+    if (!authUserId) {
+      alert('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
+
     if (confirm('¿Seguro de eliminar este registro?')) {
-      const { error } = await supabase.from(MOVIMIENTOS_TABLE).delete().eq('id', id);
+      const { error } = await supabase
+        .from(MOVIMIENTOS_TABLE)
+        .delete()
+        .eq('id', id)
+        .eq('usuario_id', authUserId);
       if (error) {
         mostrarErrorSupabase(error.message);
         return;
@@ -450,6 +560,11 @@ export default function App() {
   }
 
   async function moverMovimientoAAhorro(movimiento: Movimiento) {
+    if (!authUserId) {
+      alert('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
+
     const categoriaAhorro = obtenerCategoriaAhorro();
 
     if (!categoriaAhorro) {
@@ -471,7 +586,8 @@ export default function App() {
         categoria_id: categoriaAhorro.id,
         tipo: 'INGRESO',
       })
-      .eq('id', movimiento.id);
+      .eq('id', movimiento.id)
+      .eq('usuario_id', authUserId);
 
     if (error) {
       mostrarErrorSupabase(error.message);
@@ -654,6 +770,11 @@ export default function App() {
   }
 
   async function exportarBackup() {
+    if (!authUserId) {
+      alert('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
+
     const { data: categoriasData, error: categoriasError } = await supabase
       .from('fin_categorias')
       .select('id, nombre, icono')
@@ -666,7 +787,8 @@ export default function App() {
 
     const { data: movimientosData, error: movimientosError } = await supabase
       .from(MOVIMIENTOS_TABLE)
-      .select('id, monto, descripcion, fecha, tipo, categoria_id')
+      .select('id, monto, descripcion, fecha, tipo, categoria_id, usuario_id')
+      .eq('usuario_id', authUserId)
       .order('fecha', { ascending: true });
 
     if (movimientosError) {
@@ -701,6 +823,11 @@ export default function App() {
   }
 
   async function importarBackup(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!authUserId) {
+      alert('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
+
     const file = event.target.files?.[0];
 
     if (!file) {
@@ -730,9 +857,14 @@ export default function App() {
         return;
       }
 
+      const movimientosConUsuario = backup.movimientos.map((mov) => ({
+        ...mov,
+        usuario_id: authUserId,
+      }));
+
       const { error: movimientosError } = await supabase
         .from(MOVIMIENTOS_TABLE)
-        .upsert(backup.movimientos, { onConflict: 'id' });
+        .upsert(movimientosConUsuario, { onConflict: 'id' });
 
       if (movimientosError) {
         mostrarErrorSupabase(movimientosError.message);
@@ -797,6 +929,17 @@ export default function App() {
                 autoComplete="current-password"
               />
             </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Clave mensual</label>
+              <input
+                type="password"
+                value={loginMonthlyKey}
+                onChange={(e) => setLoginMonthlyKey(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="Clave de pago vigente"
+                autoComplete="one-time-code"
+              />
+            </div>
 
             {loginError && <p className="text-sm text-red-600">{loginError}</p>}
 
@@ -816,7 +959,10 @@ export default function App() {
   return (
     <div className="max-w-4xl mx-auto p-3 sm:p-4 md:p-6 space-y-6">
       <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Control de Gastos</h1>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Control de Gastos</h1>
+          <div className="text-xs sm:text-sm text-gray-500 mt-1">Sesión: {authUsuario}</div>
+        </div>
         <div className="no-print flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={exportarBackup}
