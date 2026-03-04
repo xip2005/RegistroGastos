@@ -49,6 +49,7 @@ const LOGIN_RPC = 'fin_login_multi';
 const ADMIN_LIST_USERS_RPC = 'fin_admin_list_usuarios';
 const ADMIN_SET_ESTADO_RPC = 'fin_admin_set_estado_pago';
 const RENOVAR_RPC = 'fin_renovar_mensualidad';
+const ADMIN_CREATE_USER_RPC = 'fin_admin_create_usuario';
 const APP_BUILD = 'build-2026-03-04-01';
 const DEUDA_INICIAL_TARJETA_KEY = 'registrogastos_deuda_inicial_tarjeta';
 const LIMITE_TARJETA_KEY = 'registrogastos_limite_tarjeta';
@@ -79,6 +80,13 @@ type UsuarioAdmin = {
   es_admin: boolean;
   activo: boolean;
   updated_at: string;
+};
+
+type AdminCreateUserResponse = {
+  ok: boolean;
+  usuario: string;
+  clave_mensual: string;
+  mensaje: string;
 };
 
 type MovimientoTarjeta = {
@@ -262,6 +270,10 @@ export default function App() {
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminProcesando, setAdminProcesando] = useState(false);
   const [adminMesesRenovacion, setAdminMesesRenovacion] = useState('1');
+  const [adminNuevoUsuario, setAdminNuevoUsuario] = useState('');
+  const [adminNuevoPassword, setAdminNuevoPassword] = useState('');
+  const [adminNuevoMeses, setAdminNuevoMeses] = useState('1');
+  const [adminNuevoEsAdmin, setAdminNuevoEsAdmin] = useState(false);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -931,6 +943,11 @@ export default function App() {
     return Number.isNaN(parsed) ? 1 : Math.max(parsed, 1);
   }
 
+  function obtenerMesesNuevoUsuario() {
+    const parsed = Number.parseInt(adminNuevoMeses.replace(/\D/g, ''), 10);
+    return Number.isNaN(parsed) ? 1 : Math.max(parsed, 1);
+  }
+
   async function cargarUsuariosAdmin() {
     if (!isAdmin) {
       return;
@@ -1064,6 +1081,74 @@ export default function App() {
 
     const resumenErrores = lineasError.length > 0 ? `\nCon error: ${lineasError.join(', ')}` : '';
     alert(`Renovados: ${lineasExito.length}.\nLas claves renovadas se copiaron al portapapeles.${resumenErrores}`);
+  }
+
+  async function crearUsuarioAdmin(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!isAdmin) {
+      return;
+    }
+
+    const usuarioNormalizado = adminNuevoUsuario.trim();
+    const passwordNormalizado = adminNuevoPassword.trim();
+
+    if (!usuarioNormalizado) {
+      alert('Ingrese el usuario nuevo.');
+      return;
+    }
+
+    if (!passwordNormalizado) {
+      alert('Ingrese la contraseña inicial.');
+      return;
+    }
+
+    setAdminProcesando(true);
+
+    const { data, error } = await supabase.rpc(ADMIN_CREATE_USER_RPC, {
+      p_usuario: usuarioNormalizado,
+      p_password: passwordNormalizado,
+      p_meses: obtenerMesesNuevoUsuario(),
+      p_es_admin: adminNuevoEsAdmin,
+    });
+
+    if (error) {
+      const textoError = [error.message, error.details, error.hint, error.code]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      if (error.code === 'PGRST202' || textoError.includes(ADMIN_CREATE_USER_RPC)) {
+        alert('Falta función de creación de usuario en DB. Ejecuta sql/setup_multiusuario_y_mensualidad.sql.');
+      } else {
+        alert(`No se pudo crear usuario: ${error.message}`);
+      }
+
+      setAdminProcesando(false);
+      return;
+    }
+
+    const payload = (Array.isArray(data) ? data[0] : data) as AdminCreateUserResponse | null;
+
+    if (!payload?.ok) {
+      alert(payload?.mensaje || 'No se pudo crear usuario.');
+      setAdminProcesando(false);
+      return;
+    }
+
+    if (payload.clave_mensual && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(`${payload.usuario}: ${payload.clave_mensual}`);
+    }
+
+    alert(`Usuario creado: ${payload.usuario}\nClave mensual: ${payload.clave_mensual}\nSe copió al portapapeles.`);
+
+    setAdminNuevoUsuario('');
+    setAdminNuevoPassword('');
+    setAdminNuevoMeses('1');
+    setAdminNuevoEsAdmin(false);
+
+    await cargarUsuariosAdmin();
+    setAdminProcesando(false);
   }
 
   async function exportarBackup() {
@@ -2188,6 +2273,58 @@ export default function App() {
             </div>
             <p className="text-xs text-gray-500 mt-2">Renovar genera una clave nueva, activa el usuario y extiende su pago por los meses indicados.</p>
             {adminError && <p className="mt-3 text-sm text-red-600">{adminError}</p>}
+
+            <form onSubmit={crearUsuarioAdmin} className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
+              <div className="md:col-span-2">
+                <label className="block text-xs text-gray-600 mb-1">Usuario nuevo</label>
+                <input
+                  type="text"
+                  value={adminNuevoUsuario}
+                  onChange={(e) => setAdminNuevoUsuario(e.target.value)}
+                  className="w-full border px-3 py-2 rounded"
+                  placeholder="cliente1"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Contraseña inicial</label>
+                <input
+                  type="text"
+                  value={adminNuevoPassword}
+                  onChange={(e) => setAdminNuevoPassword(e.target.value)}
+                  className="w-full border px-3 py-2 rounded"
+                  placeholder="clave123"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Meses iniciales</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={adminNuevoMeses}
+                  onChange={(e) => setAdminNuevoMeses(e.target.value.replace(/\D/g, '') || '1')}
+                  className="w-full border px-3 py-2 rounded"
+                />
+              </div>
+              <div className="flex md:justify-end gap-2">
+                <label className="inline-flex items-center gap-2 text-xs text-gray-600 mr-1">
+                  <input
+                    type="checkbox"
+                    checked={adminNuevoEsAdmin}
+                    onChange={(e) => setAdminNuevoEsAdmin(e.target.checked)}
+                  />
+                  Es admin
+                </label>
+                <button
+                  type="submit"
+                  disabled={adminProcesando}
+                  className="px-3 py-2 rounded bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  Crear + generar clave
+                </button>
+              </div>
+            </form>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden no-print">

@@ -31,7 +31,7 @@ select
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
-  and p.proname in ('fin_admin_list_usuarios', 'fin_admin_set_estado_pago', 'fin_renovar_mensualidad')
+  and p.proname in ('fin_admin_create_usuario', 'fin_admin_list_usuarios', 'fin_admin_set_estado_pago', 'fin_renovar_mensualidad')
 order by p.proname;
 
 -- 5) Prueba login multi (reemplaza por usuario real y clave mensual real)
@@ -39,4 +39,5 @@ order by p.proname;
 
 -- 6) Pruebas admin
 -- select * from public.fin_admin_list_usuarios();
+-- select * from public.fin_admin_create_usuario('cliente2', 'cliente2pass', 1, false);
 -- select public.fin_admin_set_estado_pago('cliente1', 'MOROSO', null);

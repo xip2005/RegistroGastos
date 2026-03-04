@@ -193,6 +193,87 @@ $$;
 
 grant execute on function public.fin_renovar_mensualidad(text, text, integer) to anon, authenticated;
 
+drop function if exists public.fin_admin_create_usuario(text, text, integer, boolean);
+
+create or replace function public.fin_admin_create_usuario(
+  p_usuario text,
+  p_password text,
+  p_meses integer default 1,
+  p_es_admin boolean default false
+)
+returns table (
+  ok boolean,
+  usuario text,
+  clave_mensual text,
+  mensaje text
+)
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_usuario text := trim(coalesce(p_usuario, ''));
+  v_password text := trim(coalesce(p_password, ''));
+  v_meses integer := greatest(coalesce(p_meses, 1), 1);
+  v_clave text;
+begin
+  if v_usuario = '' then
+    return query select false, ''::text, ''::text, 'Usuario requerido';
+    return;
+  end if;
+
+  if v_password = '' then
+    return query select false, v_usuario, ''::text, 'Contraseña requerida';
+    return;
+  end if;
+
+  if exists (
+    select 1
+    from public.fin_usuarios u
+    where lower(u.usuario) = lower(v_usuario)
+  ) then
+    return query select false, v_usuario, ''::text, 'El usuario ya existe';
+    return;
+  end if;
+
+  v_clave := format(
+    'CLAVE-%s-%s',
+    to_char(current_date, 'MMYYYY'),
+    lpad((floor(random() * 9000) + 1000)::int::text, 4, '0')
+  );
+
+  insert into public.fin_usuarios (
+    usuario,
+    password_hash,
+    activo,
+    estado_pago,
+    clave_mensual_hash,
+    es_admin,
+    pago_hasta,
+    updated_at
+  )
+  values (
+    v_usuario,
+    extensions.crypt(v_password, extensions.gen_salt('bf')),
+    true,
+    'ACTIVO',
+    extensions.crypt(v_clave, extensions.gen_salt('bf')),
+    coalesce(p_es_admin, false),
+    (
+      case
+        when coalesce(p_es_admin, false) then current_date + make_interval(months => 120)
+        else current_date + make_interval(months => v_meses)
+      end
+    )::date,
+    now()
+  );
+
+  return query select true, v_usuario, v_clave, 'Usuario creado correctamente';
+end;
+$$;
+
+grant execute on function public.fin_admin_create_usuario(text, text, integer, boolean) to anon, authenticated;
+
 create or replace function public.fin_admin_list_usuarios()
 returns table (
   id uuid,
