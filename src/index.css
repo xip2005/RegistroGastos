@@ -2,6 +2,7 @@
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -84,6 +85,13 @@ body.dark-mode textarea::placeholder {
 body.dark-mode .hover\:bg-gray-50:hover,
 body.dark-mode .hover\:bg-gray-100:hover,
 body.dark-mode .hover\:bg-slate-200:hover {
+  background-color: #1f2937 !important;
+}
+
+body.dark-mode .sm\:hover\:bg-gray-50:hover,
+body.dark-mode .sm\:hover\:bg-gray-50:active,
+body.dark-mode .sm\:hover\:bg-gray-50:focus,
+body.dark-mode .sm\:hover\:bg-gray-50:focus-within {
   background-color: #1f2937 !important;
 }
 
