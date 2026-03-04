@@ -51,6 +51,8 @@ const ADMIN_SET_ESTADO_RPC = 'fin_admin_set_estado_pago';
 const RENOVAR_RPC = 'fin_renovar_mensualidad';
 const ADMIN_CREATE_USER_RPC = 'fin_admin_create_usuario';
 const ADMIN_CLEAR_MONTHLY_KEY_RPC = 'fin_admin_clear_clave_mensual';
+const ADMIN_GET_MONTHLY_KEY_RPC = 'fin_admin_get_clave_mensual';
+const ADMIN_DELETE_USER_RPC = 'fin_admin_delete_usuario';
 const APP_BUILD = 'build-2026-03-04-01';
 const DEUDA_INICIAL_TARJETA_KEY = 'registrogastos_deuda_inicial_tarjeta';
 const LIMITE_TARJETA_KEY = 'registrogastos_limite_tarjeta';
@@ -89,6 +91,19 @@ type AdminCreateUserResponse = {
   usuario: string;
   clave_mensual: string;
   mensaje: string;
+};
+
+type AdminGetKeyResponse = {
+  ok: boolean;
+  usuario: string;
+  clave_mensual: string;
+  mensaje: string;
+};
+
+type AdminDeleteUserResponse = {
+  ok: boolean;
+  mensaje: string;
+  movimientos_eliminados: number;
 };
 
 type MovimientoTarjeta = {
@@ -1088,6 +1103,47 @@ export default function App() {
     setAdminProcesando(false);
   }
 
+  async function verClaveMensualUsuario(usuario: string) {
+    if (!isAdmin) {
+      return;
+    }
+
+    setAdminProcesando(true);
+
+    const { data, error } = await supabase.rpc(ADMIN_GET_MONTHLY_KEY_RPC, {
+      p_usuario: usuario,
+    });
+
+    if (error) {
+      const textoError = [error.message, error.details, error.hint, error.code]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      if (error.code === 'PGRST202' || textoError.includes(ADMIN_GET_MONTHLY_KEY_RPC)) {
+        alert('Falta función para ver clave mensual en DB. Ejecuta sql/setup_multiusuario_y_mensualidad.sql.');
+      } else {
+        alert(`No se pudo consultar la clave mensual de ${usuario}.`);
+      }
+
+      setAdminProcesando(false);
+      return;
+    }
+
+    const payload = (Array.isArray(data) ? data[0] : data) as AdminGetKeyResponse | null;
+
+    if (!payload?.ok || !payload.clave_mensual) {
+      alert(payload?.mensaje || `No hay clave mensual disponible para ${usuario}.`);
+      setAdminProcesando(false);
+      return;
+    }
+
+    guardarClaveGenerada(payload.usuario, payload.clave_mensual);
+    await copiarTexto(`${payload.usuario}: ${payload.clave_mensual}`);
+    alert(`Clave mensual de ${payload.usuario}: ${payload.clave_mensual}\nSe copió al portapapeles.`);
+    setAdminProcesando(false);
+  }
+
   async function quitarClaveMensualUsuario(usuario: string) {
     if (!isAdmin) {
       return;
@@ -1119,6 +1175,62 @@ export default function App() {
     await cargarUsuariosAdmin();
     setAdminProcesando(false);
     alert(`Clave mensual eliminada para ${usuario}.`);
+  }
+
+  async function eliminarUsuarioAdmin(usuario: UsuarioAdmin) {
+    if (!isAdmin) {
+      return;
+    }
+
+    if (usuario.usuario.trim().toLowerCase() === authUsuario.trim().toLowerCase()) {
+      alert('No puedes eliminar tu propio usuario en esta sesión.');
+      return;
+    }
+
+    const confirmar = confirm(`¿Eliminar usuario ${usuario.usuario}?\nSe borrarán también sus movimientos.`);
+    if (!confirmar) {
+      return;
+    }
+
+    setAdminProcesando(true);
+
+    const { data, error } = await supabase.rpc(ADMIN_DELETE_USER_RPC, {
+      p_usuario: usuario.usuario,
+    });
+
+    if (error) {
+      const textoError = [error.message, error.details, error.hint, error.code]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      if (error.code === 'PGRST202' || textoError.includes(ADMIN_DELETE_USER_RPC)) {
+        alert('Falta función para eliminar usuario en DB. Ejecuta sql/setup_multiusuario_y_mensualidad.sql.');
+      } else {
+        alert(`No se pudo eliminar ${usuario.usuario}.`);
+      }
+
+      setAdminProcesando(false);
+      return;
+    }
+
+    const payload = (Array.isArray(data) ? data[0] : data) as AdminDeleteUserResponse | null;
+
+    if (!payload?.ok) {
+      alert(payload?.mensaje || `No se pudo eliminar ${usuario.usuario}.`);
+      setAdminProcesando(false);
+      return;
+    }
+
+    setAdminClavesGeneradas((prev) => {
+      const updated = { ...prev };
+      delete updated[claveUsuarioKey(usuario.usuario)];
+      return updated;
+    });
+
+    await cargarUsuariosAdmin();
+    setAdminProcesando(false);
+    alert(`Usuario ${usuario.usuario} eliminado. Movimientos eliminados: ${payload.movimientos_eliminados ?? 0}.`);
   }
 
   async function renovarTodosUsuarios() {
@@ -2457,6 +2569,14 @@ export default function App() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
+                        onClick={() => verClaveMensualUsuario(usuario.usuario)}
+                        disabled={adminProcesando}
+                        className="px-3 py-2 rounded border border-indigo-200 text-indigo-700 text-sm hover:bg-indigo-50 disabled:opacity-60"
+                      >
+                        Ver clave
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => renovarUsuarioConNuevaClave(usuario.usuario)}
                         disabled={adminProcesando}
                         className="px-3 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-60"
@@ -2481,6 +2601,16 @@ export default function App() {
                       >
                         Quitar clave mensual
                       </button>
+                      {!usuario.es_admin && (
+                        <button
+                          type="button"
+                          onClick={() => eliminarUsuarioAdmin(usuario)}
+                          disabled={adminProcesando}
+                          className="px-3 py-2 rounded border border-red-300 text-red-700 text-sm hover:bg-red-50 disabled:opacity-60"
+                        >
+                          Eliminar usuario
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

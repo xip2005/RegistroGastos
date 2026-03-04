@@ -3,6 +3,7 @@ create extension if not exists pgcrypto;
 alter table public.fin_usuarios
   add column if not exists estado_pago text not null default 'ACTIVO',
   add column if not exists clave_mensual_hash text,
+  add column if not exists clave_mensual_visible text,
   add column if not exists es_admin boolean not null default false,
   add column if not exists pago_hasta date,
   add column if not exists updated_at timestamptz not null default now();
@@ -147,6 +148,7 @@ begin
   update public.fin_usuarios
   set
     clave_mensual_hash = extensions.crypt(p_nueva_clave, extensions.gen_salt('bf')),
+    clave_mensual_visible = p_nueva_clave,
     estado_pago = 'ACTIVO',
     updated_at = now()
   where lower(usuario) = lower(trim(p_usuario));
@@ -175,6 +177,7 @@ begin
   update public.fin_usuarios
   set
     clave_mensual_hash = extensions.crypt(p_nueva_clave, extensions.gen_salt('bf')),
+    clave_mensual_visible = p_nueva_clave,
     estado_pago = 'ACTIVO',
     pago_hasta = (
       case
@@ -248,6 +251,7 @@ begin
     activo,
     estado_pago,
     clave_mensual_hash,
+    clave_mensual_visible,
     es_admin,
     pago_hasta,
     updated_at
@@ -273,6 +277,52 @@ end;
 $$;
 
 grant execute on function public.fin_admin_create_usuario(text, text, integer, boolean) to anon, authenticated;
+
+drop function if exists public.fin_admin_get_clave_mensual(text);
+
+create or replace function public.fin_admin_get_clave_mensual(
+  p_usuario text
+)
+returns table (
+  ok boolean,
+  usuario text,
+  clave_mensual text,
+  mensaje text
+)
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_usuario text := trim(coalesce(p_usuario, ''));
+  v_clave text;
+begin
+  if v_usuario = '' then
+    return query select false, ''::text, ''::text, 'Usuario requerido';
+    return;
+  end if;
+
+  select u.clave_mensual_visible
+  into v_clave
+  from public.fin_usuarios u
+  where lower(u.usuario) = lower(v_usuario)
+  limit 1;
+
+  if not found then
+    return query select false, v_usuario, ''::text, 'Usuario no encontrado';
+    return;
+  end if;
+
+  if coalesce(v_clave, '') = '' then
+    return query select false, v_usuario, ''::text, 'Este usuario no tiene clave mensual definida';
+    return;
+  end if;
+
+  return query select true, v_usuario, v_clave, 'OK';
+end;
+$$;
+
+grant execute on function public.fin_admin_get_clave_mensual(text) to anon, authenticated;
 
 create or replace function public.fin_admin_list_usuarios()
 returns table (
@@ -350,6 +400,7 @@ begin
   update public.fin_usuarios
   set
     clave_mensual_hash = null,
+    clave_mensual_visible = null,
     updated_at = now()
   where lower(usuario) = lower(trim(p_usuario));
 
@@ -359,6 +410,68 @@ end;
 $$;
 
 grant execute on function public.fin_admin_clear_clave_mensual(text) to anon, authenticated;
+
+drop function if exists public.fin_admin_delete_usuario(text);
+
+create or replace function public.fin_admin_delete_usuario(
+  p_usuario text
+)
+returns table (
+  ok boolean,
+  mensaje text,
+  movimientos_eliminados integer
+)
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_usuario text := trim(coalesce(p_usuario, ''));
+  v_target public.fin_usuarios%rowtype;
+  v_rows integer := 0;
+  v_movimientos integer := 0;
+begin
+  if v_usuario = '' then
+    return query select false, 'Usuario requerido'::text, 0;
+    return;
+  end if;
+
+  select *
+  into v_target
+  from public.fin_usuarios u
+  where lower(u.usuario) = lower(v_usuario)
+  limit 1;
+
+  if not found then
+    return query select false, 'Usuario no encontrado'::text, 0;
+    return;
+  end if;
+
+  if coalesce(v_target.es_admin, false) then
+    return query select false, 'No se puede eliminar un usuario admin'::text, 0;
+    return;
+  end if;
+
+  delete from public.fin_movimientos m
+  where m.usuario_id = v_target.id;
+
+  get diagnostics v_movimientos = row_count;
+
+  delete from public.fin_usuarios u
+  where u.id = v_target.id;
+
+  get diagnostics v_rows = row_count;
+
+  if v_rows = 0 then
+    return query select false, 'No se pudo eliminar el usuario'::text, v_movimientos;
+    return;
+  end if;
+
+  return query select true, 'Usuario eliminado correctamente'::text, v_movimientos;
+end;
+$$;
+
+grant execute on function public.fin_admin_delete_usuario(text) to anon, authenticated;
 
 update public.fin_usuarios
 set
