@@ -50,11 +50,13 @@ const ADMIN_LIST_USERS_RPC = 'fin_admin_list_usuarios';
 const ADMIN_SET_ESTADO_RPC = 'fin_admin_set_estado_pago';
 const RENOVAR_RPC = 'fin_renovar_mensualidad';
 const ADMIN_CREATE_USER_RPC = 'fin_admin_create_usuario';
+const ADMIN_CLEAR_MONTHLY_KEY_RPC = 'fin_admin_clear_clave_mensual';
 const APP_BUILD = 'build-2026-03-04-01';
 const DEUDA_INICIAL_TARJETA_KEY = 'registrogastos_deuda_inicial_tarjeta';
 const LIMITE_TARJETA_KEY = 'registrogastos_limite_tarjeta';
 const MOVIMIENTOS_TARJETA_KEY = 'registrogastos_movimientos_tarjeta';
 const PRESUPUESTO_INGRESO_BASE_KEY = 'registrogastos_presupuesto_ingreso_base';
+const ADMIN_CLAVES_GENERADAS_KEY = 'registrogastos_admin_claves_generadas';
 
 type AuthSession = {
   ok: true;
@@ -360,6 +362,37 @@ export default function App() {
 
     cargarUsuariosAdmin();
   }, [isAuthenticated, authUserId, isAdmin, vistaActiva]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !authUserId || !isAdmin) {
+      return;
+    }
+
+    const raw = localStorage.getItem(getScopedStorageKey(ADMIN_CLAVES_GENERADAS_KEY, authUserId));
+
+    if (!raw) {
+      setAdminClavesGeneradas({});
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as Record<string, string>;
+      setAdminClavesGeneradas(parsed && typeof parsed === 'object' ? parsed : {});
+    } catch {
+      setAdminClavesGeneradas({});
+    }
+  }, [isAuthenticated, authUserId, isAdmin]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !authUserId || !isAdmin) {
+      return;
+    }
+
+    localStorage.setItem(
+      getScopedStorageKey(ADMIN_CLAVES_GENERADAS_KEY, authUserId),
+      JSON.stringify(adminClavesGeneradas),
+    );
+  }, [isAuthenticated, authUserId, isAdmin, adminClavesGeneradas]);
 
   function obtenerMensajeErrorLogin(error: {
     message: string;
@@ -1053,6 +1086,39 @@ export default function App() {
 
     await cargarUsuariosAdmin();
     setAdminProcesando(false);
+  }
+
+  async function quitarClaveMensualUsuario(usuario: string) {
+    if (!isAdmin) {
+      return;
+    }
+
+    const confirmar = confirm(`¿Quitar clave mensual de ${usuario}? Luego podrá entrar sin clave mensual hasta que generes una nueva.`);
+    if (!confirmar) {
+      return;
+    }
+
+    setAdminProcesando(true);
+
+    const { data, error } = await supabase.rpc(ADMIN_CLEAR_MONTHLY_KEY_RPC, {
+      p_usuario: usuario,
+    });
+
+    if (error || data !== true) {
+      setAdminProcesando(false);
+      alert(`No se pudo quitar la clave mensual de ${usuario}.`);
+      return;
+    }
+
+    setAdminClavesGeneradas((prev) => {
+      const updated = { ...prev };
+      delete updated[claveUsuarioKey(usuario)];
+      return updated;
+    });
+
+    await cargarUsuariosAdmin();
+    setAdminProcesando(false);
+    alert(`Clave mensual eliminada para ${usuario}.`);
   }
 
   async function renovarTodosUsuarios() {
@@ -2292,6 +2358,7 @@ export default function App() {
               </div>
             </div>
             <p className="text-xs text-gray-500 mt-2">Renovar genera una clave nueva, activa el usuario y extiende su pago por los meses indicados.</p>
+            <p className="text-xs text-gray-500 mt-1">La última clave generada queda visible aquí para copiar, incluso al recargar.</p>
             {adminError && <p className="mt-3 text-sm text-red-600">{adminError}</p>}
 
             <form onSubmit={crearUsuarioAdmin} className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
@@ -2406,6 +2473,14 @@ export default function App() {
                           Marcar moroso
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => quitarClaveMensualUsuario(usuario.usuario)}
+                        disabled={adminProcesando}
+                        className="px-3 py-2 rounded border border-amber-200 text-amber-700 text-sm hover:bg-amber-50 disabled:opacity-60"
+                      >
+                        Quitar clave mensual
+                      </button>
                     </div>
                   </div>
                 ))}

@@ -334,6 +334,32 @@ $$;
 
 grant execute on function public.fin_admin_set_estado_pago(text, text, date) to anon, authenticated;
 
+drop function if exists public.fin_admin_clear_clave_mensual(text);
+
+create or replace function public.fin_admin_clear_clave_mensual(
+  p_usuario text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_rows integer;
+begin
+  update public.fin_usuarios
+  set
+    clave_mensual_hash = null,
+    updated_at = now()
+  where lower(usuario) = lower(trim(p_usuario));
+
+  get diagnostics v_rows = row_count;
+  return v_rows > 0;
+end;
+$$;
+
+grant execute on function public.fin_admin_clear_clave_mensual(text) to anon, authenticated;
+
 update public.fin_usuarios
 set
   es_admin = true,
