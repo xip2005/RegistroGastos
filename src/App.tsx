@@ -17,6 +17,7 @@ import {
   Bug,          // BUG_REPORT
   PiggyBank,    // SAVINGS
   DollarSign,   // ATTACH_MONEY
+  Pencil,
   HelpCircle
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subDays } from 'date-fns';
@@ -566,6 +567,39 @@ export default function App() {
     }
   }
 
+  async function editarDescripcionMovimiento(movimiento: Movimiento) {
+    if (!authUserId) {
+      alert('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
+
+    const nuevaDescripcion = prompt('Editar observación', movimiento.descripcion);
+
+    if (nuevaDescripcion === null) {
+      return;
+    }
+
+    const descripcionNormalizada = nuevaDescripcion.trim();
+    if (!descripcionNormalizada) {
+      alert('La observación no puede quedar vacía.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from(MOVIMIENTOS_TABLE)
+      .update({ descripcion: descripcionNormalizada })
+      .eq('id', movimiento.id)
+      .eq('usuario_id', authUserId);
+
+    if (error) {
+      mostrarErrorSupabase(error.message);
+      return;
+    }
+
+    cargarMovimientos();
+    cargarHistorialAhorro();
+  }
+
   async function moverMovimientoAAhorro(movimiento: Movimiento) {
     if (!authUserId) {
       alert('Sesión inválida. Vuelve a iniciar sesión.');
@@ -634,6 +668,28 @@ export default function App() {
     }
 
     setMovimientosTarjeta((prev) => prev.filter((mov) => mov.id !== id));
+  }
+
+  function editarDescripcionMovimientoTarjeta(id: string, descripcionActual: string) {
+    const nuevaDescripcion = prompt('Editar observación de tarjeta', descripcionActual);
+
+    if (nuevaDescripcion === null) {
+      return;
+    }
+
+    const descripcionNormalizada = nuevaDescripcion.trim();
+    if (!descripcionNormalizada) {
+      alert('La observación no puede quedar vacía.');
+      return;
+    }
+
+    setMovimientosTarjeta((prev) =>
+      prev.map((mov) =>
+        mov.id === id
+          ? { ...mov, descripcion: descripcionNormalizada }
+          : mov,
+      ),
+    );
   }
 
   const categoriaAhorro = obtenerCategoriaAhorro();
@@ -1324,20 +1380,27 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="w-full sm:w-auto flex items-center justify-end gap-4">
-                            <span className={`font-semibold ${mov.tipo === 'INGRESO' ? 'text-emerald-600' : 'text-gray-800'}`}>
+                          <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2 sm:gap-4 flex-nowrap">
+                            <span className={`font-semibold shrink-0 whitespace-nowrap text-sm sm:text-base ${mov.tipo === 'INGRESO' ? 'text-emerald-600' : 'text-gray-800'}`}>
                               {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGs(mov.monto)}
                             </span>
                             <button
                               onClick={() => moverMovimientoAAhorro(mov)}
-                              className="text-gray-400 hover:text-sky-600 p-1 no-print"
+                              className="text-gray-400 hover:text-sky-600 p-1 no-print shrink-0"
                               title="Mover a ahorro"
                             >
                               <PiggyBank size={16} />
                             </button>
                             <button
+                              onClick={() => editarDescripcionMovimiento(mov)}
+                              className="text-gray-400 hover:text-blue-600 p-1 no-print shrink-0"
+                              title="Editar observación"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button
                               onClick={() => eliminarMovimiento(mov.id)}
-                              className="text-gray-400 hover:text-red-500 p-1 no-print"
+                              className="text-gray-400 hover:text-red-500 p-1 no-print shrink-0"
                               title="Eliminar"
                             >
                               <Trash2 size={16} />
@@ -1580,13 +1643,20 @@ export default function App() {
                         <p className="font-medium text-gray-800">{mov.descripcion}</p>
                         <p className="text-xs text-gray-500">{format(new Date(mov.fecha + 'T00:00:00'), 'dd/MM/yyyy')}</p>
                       </div>
-                      <div className="w-full sm:w-auto flex items-center justify-end gap-3">
-                        <span className={`font-semibold ${mov.tipo === 'INGRESO' ? 'text-sky-700' : 'text-amber-700'}`}>
+                      <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-nowrap">
+                        <span className={`font-semibold shrink-0 whitespace-nowrap text-sm sm:text-base ${mov.tipo === 'INGRESO' ? 'text-sky-700' : 'text-amber-700'}`}>
                           {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGs(mov.monto)}
                         </span>
                         <button
+                          onClick={() => editarDescripcionMovimiento(mov)}
+                          className="text-gray-400 hover:text-blue-600 p-1 no-print shrink-0"
+                          title="Editar observación"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
                           onClick={() => eliminarMovimiento(mov.id)}
-                          className="text-gray-400 hover:text-red-500 p-1 no-print"
+                          className="text-gray-400 hover:text-red-500 p-1 no-print shrink-0"
                           title="Eliminar movimiento de ahorro"
                         >
                           <Trash2 size={16} />
@@ -1755,13 +1825,20 @@ export default function App() {
                         <p className="font-medium text-gray-800">{mov.descripcion}</p>
                         <p className="text-xs text-gray-500">{format(new Date(mov.fecha + 'T00:00:00'), 'dd/MM/yyyy')}</p>
                       </div>
-                      <div className="w-full sm:w-auto flex items-center justify-end gap-3">
-                        <span className={`font-semibold ${mov.tipo === 'GASTO' ? 'text-red-700' : 'text-emerald-700'}`}>
+                      <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-nowrap">
+                        <span className={`font-semibold shrink-0 whitespace-nowrap text-sm sm:text-base ${mov.tipo === 'GASTO' ? 'text-red-700' : 'text-emerald-700'}`}>
                           {mov.tipo === 'GASTO' ? '+' : '-'}{formatGs(mov.monto)}
                         </span>
                         <button
+                          onClick={() => editarDescripcionMovimientoTarjeta(mov.id, mov.descripcion)}
+                          className="text-gray-400 hover:text-blue-600 p-1 shrink-0"
+                          title="Editar observación"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
                           onClick={() => eliminarMovimientoTarjeta(mov.id)}
-                          className="text-gray-400 hover:text-red-500 p-1"
+                          className="text-gray-400 hover:text-red-500 p-1 shrink-0"
                           title="Eliminar movimiento de tarjeta"
                         >
                           <Trash2 size={16} />

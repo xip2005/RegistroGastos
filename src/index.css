@@ -19,6 +19,7 @@ body {
   background-color: #f3f4f6;
   color: #1f2937;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
 }
 
 .mobile-scroll-x {
@@ -45,6 +46,10 @@ textarea {
   input[type='date'],
   input[type='month'] {
     min-width: 150px;
+  }
+
+  .mobile-scroll-x {
+    max-width: 100%;
   }
 
   input,
