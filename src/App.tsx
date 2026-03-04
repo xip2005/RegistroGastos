@@ -205,8 +205,9 @@ export default function App() {
   const [fechaFin, setFechaFin] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const [busquedaHistorial, setBusquedaHistorial] = useState('');
   const [filtroTipoHistorial, setFiltroTipoHistorial] = useState<FiltroTipoHistorial>('TODOS');
-  const [saldoReal, setSaldoReal] = useState('');
   const [mostrarModalMovimiento, setMostrarModalMovimiento] = useState(false);
+  const [mostrarPresupuesto, setMostrarPresupuesto] = useState(false);
+  const [mostrarHistorialDetalle, setMostrarHistorialDetalle] = useState(true);
   const [presupuestoIngresoBase, setPresupuestoIngresoBase] = useState('');
   const [deudaInicialTarjeta, setDeudaInicialTarjeta] = useState('1.997.217');
   const [limiteTarjeta, setLimiteTarjeta] = useState('2.200.000');
@@ -723,12 +724,6 @@ export default function App() {
     .filter((mov) => mov.tipo === 'PAGO')
     .reduce((acc, mov) => acc + mov.monto, 0);
   const variacionTarjetaMes = gastosTarjetaMes - pagosTarjetaMes;
-  const saldoRealNumero = saldoReal ? parseGsInputToNumber(saldoReal) : null;
-  const diferencia = saldoRealNumero === null ? null : saldoRealNumero - saldoDisponible;
-  const movimientosCoincidentes = diferencia === null
-    ? []
-    : movimientosNoAhorro.filter((mov) => Math.abs(mov.monto) === Math.abs(diferencia));
-
   const movimientosFiltrados = movimientosNoAhorro.filter((mov) => {
     const coincideTipo = filtroTipoHistorial === 'TODOS' || mov.tipo === filtroTipoHistorial;
     const texto = busquedaHistorial.trim().toLowerCase();
@@ -1060,9 +1055,16 @@ export default function App() {
           </div>
 
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 no-print">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">Presupuesto sugerido</h2>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMostrarPresupuesto((prev) => !prev)}
+                  className="px-3 py-2 rounded border border-gray-200 hover:bg-gray-50 text-sm"
+                >
+                  {mostrarPresupuesto ? 'Ocultar' : 'Mostrar'}
+                </button>
                 <label className="text-sm text-gray-600">Ingreso base</label>
                 <input
                   type="text"
@@ -1080,286 +1082,269 @@ export default function App() {
                   Auto
                 </button>
               </div>
+
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-              <div className="rounded-lg border border-gray-100 p-3 bg-gray-50">
-                <div className="text-sm text-gray-600">Gasto sugerido total (80%)</div>
-                <div className="text-xl font-semibold text-blue-700">{formatGsNoDecimals(presupuestoGastosSugeridoTotal)}</div>
-              </div>
-              <div className="rounded-lg border border-gray-100 p-3 bg-gray-50">
-                <div className="text-sm text-gray-600">Ahorro sugerido (20%)</div>
-                <div className="text-xl font-semibold text-sky-700">{formatGsNoDecimals(presupuestoAhorroSugerido)}</div>
-              </div>
-            </div>
-
-            <div className="divide-y divide-gray-100 border rounded-lg overflow-hidden">
-              {presupuestoPorCategoria.map((item) => (
-                <div key={`presupuesto-${item.categoria.id}`} className="p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div>
-                    <div className="font-medium text-gray-800">{item.categoria.nombre}</div>
-                    <div className="text-xs text-gray-500">Actual: {formatGsNoDecimals(item.gastoActual)} · Sugerido: {formatGsNoDecimals(item.recomendado)}</div>
+              {mostrarPresupuesto && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 mt-3">
+                    <div className="rounded-lg border border-gray-100 p-3 bg-gray-50">
+                      <div className="text-sm text-gray-600">Gasto sugerido total (80%)</div>
+                      <div className="text-xl font-semibold text-blue-700">{formatGsNoDecimals(presupuestoGastosSugeridoTotal)}</div>
+                    </div>
+                    <div className="rounded-lg border border-gray-100 p-3 bg-gray-50">
+                      <div className="text-sm text-gray-600">Ahorro sugerido (20%)</div>
+                      <div className="text-xl font-semibold text-sky-700">{formatGsNoDecimals(presupuestoAhorroSugerido)}</div>
+                    </div>
                   </div>
-                  <span className={`text-xs font-semibold px-2 py-1 rounded-full ${item.estado === 'ALTO' ? 'bg-red-100 text-red-700' : item.estado === 'ATENCION' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                    {item.estado === 'ALTO' ? 'Alto' : item.estado === 'ATENCION' ? 'Atención' : 'OK'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 no-print">
-            <h2 className="text-lg font-semibold mb-3">Cuadre rápido</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Saldo real (lo que tienes)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={saldoReal}
-                  onChange={(e) => setSaldoReal(formatGsInputFromDigits(e.target.value))}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <div className="text-sm text-gray-500">Saldo disponible (sin ahorro)</div>
-                <div className="text-lg font-semibold text-gray-800">{formatGsNoDecimals(saldoDisponible)}</div>
-                <div className="text-xs text-gray-500 mt-1">Balance ({formatGs(balance)}) - Ahorro neto ({formatGs(ahorroAcumulado)})</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-500">Diferencia</div>
-                <div className={`text-lg font-semibold ${diferencia === null ? 'text-gray-500' : diferencia === 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {diferencia === null ? 'Ingresa saldo real' : formatGs(diferencia)}
-                </div>
-              </div>
-            </div>
-            {diferencia !== null && diferencia !== 0 && (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                <p className="font-medium">Posibles movimientos por {formatGs(Math.abs(diferencia))}:</p>
-                {movimientosCoincidentes.length === 0 ? (
-                  <p className="mt-1">No hay movimientos exactos con ese monto en el rango actual.</p>
-                ) : (
-                  <ul className="mt-1 space-y-1">
-                    {movimientosCoincidentes.slice(0, 5).map((mov) => (
-                      <li key={`match-${mov.id}`}>
-                        {format(new Date(mov.fecha + 'T00:00:00'), 'dd/MM/yyyy')} · {mov.descripcion} · {mov.tipo} · {formatGs(mov.monto)}
-                      </li>
+                  <div className="divide-y divide-gray-100 border rounded-lg overflow-hidden">
+                    {presupuestoPorCategoria.map((item) => (
+                      <div key={`presupuesto-${item.categoria.id}`} className="p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                          <div className="font-medium text-gray-800">{item.categoria.nombre}</div>
+                          <div className="text-xs text-gray-500">Actual: {formatGsNoDecimals(item.gastoActual)} · Sugerido: {formatGsNoDecimals(item.recomendado)}</div>
+                        </div>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${item.estado === 'ALTO' ? 'bg-red-100 text-red-700' : item.estado === 'ATENCION' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {item.estado === 'ALTO' ? 'Alto' : item.estado === 'ATENCION' ? 'Atención' : 'OK'}
+                        </span>
+                      </div>
                     ))}
-                  </ul>
-                )}
-              </div>
-            )}
-          </div>
+                  </div>
+                </>
+              )}
+
+              {!mostrarPresupuesto && (
+                <div className="mt-3 text-sm text-gray-500">Presupuesto oculto para simplificar la vista. Toca “Mostrar”.</div>
+              )}
+            </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="hidden lg:col-span-1 bg-white p-5 rounded-xl shadow-sm border border-gray-100 no-print">
-          <h2 className="text-lg font-semibold mb-4">Nuevo Registro</h2>
-          <form onSubmit={guardarMovimiento} className="space-y-4">
-            <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
-              <button
-                type="button"
-                className={`flex-1 py-2 text-sm font-medium rounded-md flex justify-center items-center gap-1 transition ${tipo === 'GASTO' ? 'bg-white shadow text-red-600' : 'text-gray-500'}`}
-                onClick={() => setTipo('GASTO')}
-              >
-                <MinusCircle size={16} /> Gasto
-              </button>
-              <button
-                type="button"
-                className={`flex-1 py-2 text-sm font-medium rounded-md flex justify-center items-center gap-1 transition ${tipo === 'INGRESO' ? 'bg-white shadow text-emerald-600' : 'text-gray-500'}`}
-                onClick={() => setTipo('INGRESO')}
-              >
-                <PlusCircle size={16} /> Ingreso
-              </button>
-            </div>
+              <h2 className="text-lg font-semibold mb-4">Nuevo Registro</h2>
+              <form onSubmit={guardarMovimiento} className="space-y-4">
+                <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+                  <button
+                    type="button"
+                    className={`flex-1 py-2 text-sm font-medium rounded-md flex justify-center items-center gap-1 transition ${tipo === 'GASTO' ? 'bg-white shadow text-red-600' : 'text-gray-500'}`}
+                    onClick={() => setTipo('GASTO')}
+                  >
+                    <MinusCircle size={16} /> Gasto
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 py-2 text-sm font-medium rounded-md flex justify-center items-center gap-1 transition ${tipo === 'INGRESO' ? 'bg-white shadow text-emerald-600' : 'text-gray-500'}`}
+                    onClick={() => setTipo('INGRESO')}
+                  >
+                    <PlusCircle size={16} /> Ingreso
+                  </button>
+                </div>
 
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Monto (Gs)</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                required
-                value={monto}
-                onChange={e => setMonto(formatGsInputFromDigits(e.target.value))}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="0,00"
-              />
-            </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Monto (Gs)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    value={monto}
+                    onChange={e => setMonto(formatGsInputFromDigits(e.target.value))}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="0,00"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Descripción</label>
-              <input
-                type="text"
-                required
-                value={descripcion}
-                onChange={e => setDescripcion(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="Ej. Compra súper"
-              />
-            </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Descripción</label>
+                  <input
+                    type="text"
+                    required
+                    value={descripcion}
+                    onChange={e => setDescripcion(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Ej. Compra súper"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Categoría</label>
-              <select
-                value={categoriaId}
-                onChange={e => setCategoriaId(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-              >
-                {categorias.map(c => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
-                ))}
-              </select>
-            </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Categoría</label>
+                  <select
+                    value={categoriaId}
+                    onChange={e => setCategoriaId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  >
+                    {categorias.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
+                </div>
 
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Fecha</label>
-              <input
-                type="date"
-                required
-                value={fecha}
-                onChange={e => setFecha(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Fecha</label>
+                  <input
+                    type="date"
+                    required
+                    value={fecha}
+                    onChange={e => setFecha(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
 
-            <button
-              type="submit"
-              className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition font-medium"
-            >
-              Guardar {tipo === 'GASTO' ? 'Gasto' : 'Ingreso'}
-            </button>
-          </form>
-        </div>
+                <button
+                  type="submit"
+                  className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition font-medium"
+                >
+                  Guardar {tipo === 'GASTO' ? 'Gasto' : 'Ingreso'}
+                </button>
+              </form>
+            </div>
 
             <div className="lg:col-span-3 space-y-4">
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center justify-between">
-            <h2 className="text-lg font-semibold">Historial</h2>
-            <div className="w-full mobile-scroll-x">
-              <div className="inline-flex items-center gap-2 text-sm min-w-max pr-1">
-                <input 
-                  type="date" 
-                  value={fechaInicio} 
-                  onChange={e => setFechaInicio(e.target.value)}
-                  className="border px-2 py-1 rounded"
-                />
-                <span>a</span>
-                <input 
-                  type="date" 
-                  value={fechaFin} 
-                  onChange={e => setFechaFin(e.target.value)}
-                  className="border px-2 py-1 rounded"
-                />
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center justify-between">
+                <h2 className="text-lg font-semibold">Historial</h2>
                 <button
                   type="button"
-                  onClick={aplicarQuincena}
-                  className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
+                  onClick={() => setMostrarHistorialDetalle((prev) => !prev)}
+                  className="px-3 py-2 rounded border border-gray-200 hover:bg-gray-50 text-sm"
                 >
-                  Últimos 15 días
+                  {mostrarHistorialDetalle ? 'Ocultar detalle' : 'Mostrar detalle'}
                 </button>
-                <button
-                  type="button"
-                  onClick={aplicarEsteMes}
-                  className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
-                >
-                  Este mes
-                </button>
-                <button
-                  type="button"
-                  onClick={aplicarTodoHistorial}
-                  className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
-                >
-                  Todo
-                </button>
-              </div>
-            </div>
-            <div className="w-full flex flex-col md:flex-row gap-2 md:items-center">
-              <input
-                type="text"
-                value={busquedaHistorial}
-                onChange={(e) => setBusquedaHistorial(e.target.value)}
-                placeholder="Buscar por descripción o categoría"
-                className="w-full md:max-w-sm border px-3 py-2 rounded-lg"
-              />
-              <div className="mobile-scroll-x">
-                <div className="inline-flex gap-2 min-w-max">
-                <button
-                  type="button"
-                  onClick={() => setFiltroTipoHistorial('TODOS')}
-                  className={`px-3 py-2 rounded-lg border ${filtroTipoHistorial === 'TODOS' ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 hover:bg-gray-50'}`}
-                >
-                  Todos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFiltroTipoHistorial('GASTO')}
-                  className={`px-3 py-2 rounded-lg border ${filtroTipoHistorial === 'GASTO' ? 'bg-red-600 text-white border-red-600' : 'border-gray-200 hover:bg-gray-50'}`}
-                >
-                  Gastos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFiltroTipoHistorial('INGRESO')}
-                  className={`px-3 py-2 rounded-lg border ${filtroTipoHistorial === 'INGRESO' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-gray-200 hover:bg-gray-50'}`}
-                >
-                  Ingresos
-                </button>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
-            {movimientosFiltrados.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                No hay movimientos en este periodo
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {movimientosFiltrados.map(mov => {
-                  const Icon = mov.categorias ? (iconMap[mov.categorias.icono] || <HelpCircle className="w-5 h-5" />) : <HelpCircle className="w-5 h-5" />;
-                  
-                  return (
-                    <div key={mov.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-gray-50 transition">
-                      <div className="flex items-start gap-3 sm:gap-4 min-w-0">
-                        <div className={`p-2 rounded-full bg-gray-100`}>
-                          {Icon}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-medium text-gray-800 break-words">{mov.descripcion}</p>
-                          <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-0.5">
-                            <span>{format(new Date(mov.fecha + 'T00:00:00'), 'dd MMM yyyy')}</span>
-                            <span>•</span>
-                            <span>{mov.categorias?.nombre || 'Sin categoría'}</span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="w-full sm:w-auto flex items-center justify-end gap-4">
-                        <span className={`font-semibold ${mov.tipo === 'INGRESO' ? 'text-emerald-600' : 'text-gray-800'}`}>
-                          {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGs(mov.monto)}
-                        </span>
+                {mostrarHistorialDetalle && (
+                  <>
+                    <div className="w-full mobile-scroll-x">
+                      <div className="inline-flex items-center gap-2 text-sm min-w-max pr-1">
+                        <input 
+                          type="date" 
+                          value={fechaInicio} 
+                          onChange={e => setFechaInicio(e.target.value)}
+                          className="border px-2 py-1 rounded"
+                        />
+                        <span>a</span>
+                        <input 
+                          type="date" 
+                          value={fechaFin} 
+                          onChange={e => setFechaFin(e.target.value)}
+                          className="border px-2 py-1 rounded"
+                        />
                         <button
-                          onClick={() => moverMovimientoAAhorro(mov)}
-                          className="text-gray-400 hover:text-sky-600 p-1 no-print"
-                          title="Mover a ahorro"
+                          type="button"
+                          onClick={aplicarQuincena}
+                          className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
                         >
-                          <PiggyBank size={16} />
+                          Últimos 15 días
                         </button>
-                        <button 
-                          onClick={() => eliminarMovimiento(mov.id)}
-                          className="text-gray-400 hover:text-red-500 p-1 no-print"
-                          title="Eliminar"
+                        <button
+                          type="button"
+                          onClick={aplicarEsteMes}
+                          className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
                         >
-                          <Trash2 size={16} />
+                          Este mes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={aplicarTodoHistorial}
+                          className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
+                        >
+                          Todo
                         </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
 
+                    <div className="w-full flex flex-col md:flex-row gap-2 md:items-center">
+                      <input
+                        type="text"
+                        value={busquedaHistorial}
+                        onChange={(e) => setBusquedaHistorial(e.target.value)}
+                        placeholder="Buscar por descripción o categoría"
+                        className="w-full md:max-w-sm border px-3 py-2 rounded-lg"
+                      />
+                      <div className="mobile-scroll-x">
+                        <div className="inline-flex gap-2 min-w-max">
+                          <button
+                            type="button"
+                            onClick={() => setFiltroTipoHistorial('TODOS')}
+                            className={`px-3 py-2 rounded-lg border ${filtroTipoHistorial === 'TODOS' ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 hover:bg-gray-50'}`}
+                          >
+                            Todos
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFiltroTipoHistorial('GASTO')}
+                            className={`px-3 py-2 rounded-lg border ${filtroTipoHistorial === 'GASTO' ? 'bg-red-600 text-white border-red-600' : 'border-gray-200 hover:bg-gray-50'}`}
+                          >
+                            Gastos
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFiltroTipoHistorial('INGRESO')}
+                            className={`px-3 py-2 rounded-lg border ${filtroTipoHistorial === 'INGRESO' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-gray-200 hover:bg-gray-50'}`}
+                          >
+                            Ingresos
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {!mostrarHistorialDetalle && (
+                  <div className="w-full text-sm text-gray-500">Detalle oculto para navegación rápida. Toca “Mostrar detalle”.</div>
+                )}
+              </div>
+
+              {mostrarHistorialDetalle && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
+                  {movimientosFiltrados.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">
+                      No hay movimientos en este periodo
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {movimientosFiltrados.map(mov => {
+                        const Icon = mov.categorias ? (iconMap[mov.categorias.icono] || <HelpCircle className="w-5 h-5" />) : <HelpCircle className="w-5 h-5" />;
+
+                        return (
+                          <div key={mov.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-gray-50 transition">
+                            <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+                              <div className={`p-2 rounded-full bg-gray-100`}>
+                                {Icon}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-medium text-gray-800 break-words">{mov.descripcion}</p>
+                                <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-0.5">
+                                  <span>{format(new Date(mov.fecha + 'T00:00:00'), 'dd MMM yyyy')}</span>
+                                  <span>•</span>
+                                  <span>{mov.categorias?.nombre || 'Sin categoría'}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="w-full sm:w-auto flex items-center justify-end gap-4">
+                              <span className={`font-semibold ${mov.tipo === 'INGRESO' ? 'text-emerald-600' : 'text-gray-800'}`}>
+                                {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGs(mov.monto)}
+                              </span>
+                              <button
+                                onClick={() => moverMovimientoAAhorro(mov)}
+                                className="text-gray-400 hover:text-sky-600 p-1 no-print"
+                                title="Mover a ahorro"
+                              >
+                                <PiggyBank size={16} />
+                              </button>
+                              <button
+                                onClick={() => eliminarMovimiento(mov.id)}
+                                className="text-gray-400 hover:text-red-500 p-1 no-print"
+                                title="Eliminar"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

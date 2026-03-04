@@ -3,7 +3,7 @@ select column_name, data_type
 from information_schema.columns
 where table_schema = 'public'
   and table_name = 'fin_usuarios'
-  and column_name in ('estado_pago', 'clave_mensual_hash', 'updated_at')
+  and column_name in ('estado_pago', 'clave_mensual_hash', 'pago_hasta', 'updated_at')
 order by column_name;
 
 -- 2) Verifica columna usuario_id en movimientos

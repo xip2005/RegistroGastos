@@ -3,6 +3,7 @@ create extension if not exists pgcrypto;
 alter table public.fin_usuarios
   add column if not exists estado_pago text not null default 'ACTIVO',
   add column if not exists clave_mensual_hash text,
+  add column if not exists pago_hasta date,
   add column if not exists updated_at timestamptz not null default now();
 
 do $$
@@ -96,6 +97,17 @@ begin
     return;
   end if;
 
+  if v_usuario.pago_hasta is null or v_usuario.pago_hasta < current_date then
+    update public.fin_usuarios
+    set
+      estado_pago = 'MOROSO',
+      updated_at = now()
+    where id = v_usuario.id;
+
+    return query select false, null::uuid, v_usuario.usuario, 'MOROSO'::text, 'Mensualidad vencida. Contacta al administrador.';
+    return;
+  end if;
+
   if coalesce(v_usuario.clave_mensual_hash, '') <> ''
      and v_usuario.clave_mensual_hash <> extensions.crypt(coalesce(p_clave_mensual, ''), v_usuario.clave_mensual_hash) then
     return query select false, null::uuid, v_usuario.usuario, v_usuario.estado_pago, 'Clave mensual inválida';
@@ -138,9 +150,47 @@ $$;
 
 grant execute on function public.fin_set_clave_mensual(text, text) to anon, authenticated;
 
+create or replace function public.fin_renovar_mensualidad(
+  p_usuario text,
+  p_nueva_clave text,
+  p_meses integer default 1
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_rows integer;
+  v_meses integer := greatest(coalesce(p_meses, 1), 1);
+begin
+  update public.fin_usuarios
+  set
+    clave_mensual_hash = extensions.crypt(p_nueva_clave, extensions.gen_salt('bf')),
+    estado_pago = 'ACTIVO',
+    pago_hasta = (
+      case
+        when pago_hasta is null or pago_hasta < current_date then current_date
+        else pago_hasta
+      end
+      + make_interval(months => v_meses)
+    )::date,
+    updated_at = now()
+  where lower(usuario) = lower(trim(p_usuario));
+
+  get diagnostics v_rows = row_count;
+  return v_rows > 0;
+end;
+$$;
+
+grant execute on function public.fin_renovar_mensualidad(text, text, integer) to anon, authenticated;
+
 -- Ejemplos rápidos de administración:
 -- Marcar mensualidad pendiente:
 -- update public.fin_usuarios set estado_pago = 'MOROSO' where lower(usuario) = lower('cliente1');
 --
 -- Reactivar y definir clave mensual:
 -- select public.fin_set_clave_mensual('cliente1', 'CLAVE-MAR-2026');
+--
+-- Renovar mensualidad (1 mes) y actualizar clave mensual:
+-- select public.fin_renovar_mensualidad('cliente1', 'CLAVE-ABR-2026', 1);
