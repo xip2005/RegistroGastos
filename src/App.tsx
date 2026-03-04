@@ -1814,6 +1814,28 @@ export default function App() {
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 no-print">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">Presupuesto sugerido</h2>
+              <div className="w-full sm:w-auto space-y-2">
+                <div className="text-xs font-medium text-gray-600">Salario mensual (ingreso base)</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-sm text-gray-600">Monto</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={presupuestoIngresoBase}
+                    onChange={(e) => setPresupuestoIngresoBase(formatGsInputFromDigits(e.target.value))}
+                    className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none w-44"
+                    placeholder={formatGsNoDecimals(ingresos)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPresupuestoIngresoBase('')}
+                    className="px-3 py-2 rounded border border-gray-200 hover:bg-gray-50 text-sm"
+                  >
+                    Usar automático
+                  </button>
+                </div>
+                <div className="text-xs text-gray-500">Tip: si no cargas salario manual, la app usa tus ingresos registrados.</div>
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -1821,22 +1843,6 @@ export default function App() {
                   className="px-3 py-2 rounded border border-gray-200 hover:bg-gray-50 text-sm"
                 >
                   {mostrarPresupuesto ? 'Ocultar' : 'Mostrar'}
-                </button>
-                <label className="text-sm text-gray-600">Ingreso base</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={presupuestoIngresoBase}
-                  onChange={(e) => setPresupuestoIngresoBase(formatGsInputFromDigits(e.target.value))}
-                  className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none w-40"
-                  placeholder={formatGsNoDecimals(ingresos)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setPresupuestoIngresoBase('')}
-                  className="px-3 py-2 rounded border border-gray-200 hover:bg-gray-50 text-sm"
-                >
-                  Auto
                 </button>
               </div>
 
@@ -2124,10 +2130,12 @@ export default function App() {
           <button
             type="button"
             onClick={() => setMostrarModalMovimiento(true)}
-            className="no-print fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 sm:right-6 z-40 w-14 h-14 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 flex items-center justify-center"
+            className="no-print fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 sm:right-6 z-40 h-14 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 flex items-center gap-2 px-4"
             title="Agregar movimiento"
+            aria-label="Nuevo registro"
           >
             <PlusCircle size={26} />
+            <span className="text-sm font-semibold">Nuevo registro</span>
           </button>
 
           {mostrarModalMovimiento && (
