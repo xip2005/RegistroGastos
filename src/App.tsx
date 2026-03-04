@@ -45,6 +45,8 @@ type VistaPrincipal = 'MOVIMIENTOS' | 'AHORRO' | 'TARJETA' | 'ADMIN';
 type TarjetaTipo = 'GASTO' | 'PAGO';
 const MOVIMIENTOS_TABLE = 'fin_movimientos';
 const SESSION_KEY = 'registrogastos_auth';
+const SESSION_REMEMBER_KEY = 'registrogastos_auth_remember';
+const REMEMBER_SESSION_DAYS = 30;
 const LOGIN_RPC = 'fin_login_multi';
 const ADMIN_LIST_USERS_RPC = 'fin_admin_list_usuarios';
 const ADMIN_SET_ESTADO_RPC = 'fin_admin_set_estado_pago';
@@ -58,12 +60,17 @@ const TARJETA_CONFIG_TABLE = 'fin_tarjeta_config';
 const TARJETA_MOVIMIENTOS_TABLE = 'fin_tarjeta_movimientos';
 const PRESUPUESTO_INGRESO_BASE_KEY = 'registrogastos_presupuesto_ingreso_base';
 const ADMIN_CLAVES_GENERADAS_KEY = 'registrogastos_admin_claves_generadas';
+const OFFLINE_PENDING_MOVIMIENTOS_KEY = 'registrogastos_offline_pending_movimientos';
 
 type AuthSession = {
   ok: true;
   userId: string;
   usuario: string;
   esAdmin: boolean;
+};
+
+type RememberedAuthSession = AuthSession & {
+  expiresAt: string;
 };
 
 type LoginRpcResponse = {
@@ -111,6 +118,15 @@ type MovimientoTarjeta = {
   monto: number;
   descripcion: string;
   fecha: string;
+};
+
+type PendingMovimientoInsert = {
+  monto: number;
+  descripcion: string;
+  tipo: 'INGRESO' | 'GASTO';
+  categoria_id: string;
+  fecha: string;
+  usuario_id: string;
 };
 
 type BackupPayload = {
@@ -203,24 +219,56 @@ function parseGsInputToNumber(value: string) {
 }
 
 function readAuthSession(): AuthSession | null {
-  const raw = sessionStorage.getItem(SESSION_KEY);
+  const rawSession = sessionStorage.getItem(SESSION_KEY);
 
-  if (!raw) {
+  if (rawSession) {
+    try {
+      const parsed = JSON.parse(rawSession) as Partial<AuthSession>;
+      if (parsed.ok === true && typeof parsed.userId === 'string' && parsed.userId && typeof parsed.usuario === 'string') {
+        return {
+          ok: true,
+          userId: parsed.userId,
+          usuario: parsed.usuario,
+          esAdmin: parsed.esAdmin === true,
+        };
+      }
+    } catch {
+      sessionStorage.removeItem(SESSION_KEY);
+    }
+  }
+
+  const rawRemember = localStorage.getItem(SESSION_REMEMBER_KEY);
+
+  if (!rawRemember) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(raw) as Partial<AuthSession>;
-    if (parsed.ok === true && typeof parsed.userId === 'string' && parsed.userId && typeof parsed.usuario === 'string') {
-      return {
+    const parsed = JSON.parse(rawRemember) as Partial<RememberedAuthSession>;
+    const expiresAt = typeof parsed.expiresAt === 'string' ? Date.parse(parsed.expiresAt) : Number.NaN;
+
+    if (
+      parsed.ok === true
+      && typeof parsed.userId === 'string'
+      && parsed.userId
+      && typeof parsed.usuario === 'string'
+      && Number.isFinite(expiresAt)
+      && expiresAt > Date.now()
+    ) {
+      const auth: AuthSession = {
         ok: true,
         userId: parsed.userId,
         usuario: parsed.usuario,
         esAdmin: parsed.esAdmin === true,
       };
+
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(auth));
+      return auth;
     }
+
+    localStorage.removeItem(SESSION_REMEMBER_KEY);
   } catch {
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_REMEMBER_KEY);
   }
 
   return null;
@@ -230,15 +278,48 @@ function getScopedStorageKey(baseKey: string, userId: string) {
   return `${baseKey}:${userId}`;
 }
 
+function getPendingMovimientosKey(userId: string) {
+  return getScopedStorageKey(OFFLINE_PENDING_MOVIMIENTOS_KEY, userId);
+}
+
+function readPendingMovimientos(userId: string): PendingMovimientoInsert[] {
+  const raw = localStorage.getItem(getPendingMovimientosKey(userId));
+
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as PendingMovimientoInsert[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    localStorage.removeItem(getPendingMovimientosKey(userId));
+    return [];
+  }
+}
+
+function writePendingMovimientos(userId: string, data: PendingMovimientoInsert[]) {
+  if (data.length === 0) {
+    localStorage.removeItem(getPendingMovimientosKey(userId));
+    return;
+  }
+
+  localStorage.setItem(getPendingMovimientosKey(userId), JSON.stringify(data));
+}
+
 export default function App() {
-  const [authSession, setAuthSession] = useState<AuthSession | null>(() => readAuthSession());
-  const [isAuthenticated, setIsAuthenticated] = useState(() => readAuthSession() !== null);
+  const initialAuthSession = readAuthSession();
+  const [authSession, setAuthSession] = useState<AuthSession | null>(initialAuthSession);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => initialAuthSession !== null);
   const authUserId = authSession?.userId ?? null;
   const authUsuario = authSession?.usuario ?? '';
   const isAdmin = authSession?.esAdmin ?? false;
   const [loginUser, setLoginUser] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginMonthlyKey, setLoginMonthlyKey] = useState('');
+  const [mostrarLoginPassword, setMostrarLoginPassword] = useState(false);
+  const [mostrarLoginMonthlyKey, setMostrarLoginMonthlyKey] = useState(false);
+  const [recordarDispositivo, setRecordarDispositivo] = useState(true);
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -302,6 +383,9 @@ export default function App() {
   const [adminNuevoMeses, setAdminNuevoMeses] = useState('1');
   const [adminNuevoEsAdmin, setAdminNuevoEsAdmin] = useState(false);
   const [mostrarSoporteModal, setMostrarSoporteModal] = useState(false);
+  const [estaOnline, setEstaOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
+  const [pendientesOfflineCount, setPendientesOfflineCount] = useState(0);
+  const [sincronizandoOffline, setSincronizandoOffline] = useState(false);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -453,6 +537,85 @@ export default function App() {
     );
   }, [isAuthenticated, authUserId, isAdmin, adminClavesGeneradas]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const onOnline = () => setEstaOnline(true);
+    const onOffline = () => setEstaOnline(false);
+
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!authUserId) {
+      setPendientesOfflineCount(0);
+      return;
+    }
+
+    setPendientesOfflineCount(readPendingMovimientos(authUserId).length);
+
+    if (estaOnline) {
+      void sincronizarMovimientosPendientes(authUserId);
+    }
+  }, [authUserId, estaOnline]);
+
+  function esErrorDeConexion(errorMessage: string) {
+    const texto = errorMessage.toLowerCase();
+    return (
+      texto.includes('failed to fetch')
+      || texto.includes('network')
+      || texto.includes('load failed')
+      || texto.includes('fetch')
+    );
+  }
+
+  function agregarPendienteOffline(userId: string, payload: PendingMovimientoInsert) {
+    const pendientes = readPendingMovimientos(userId);
+    const actualizados = [...pendientes, payload];
+    writePendingMovimientos(userId, actualizados);
+    setPendientesOfflineCount(actualizados.length);
+  }
+
+  async function sincronizarMovimientosPendientes(userId: string) {
+    if (!userId || !estaOnline) {
+      return;
+    }
+
+    const pendientes = readPendingMovimientos(userId);
+    if (pendientes.length === 0) {
+      setPendientesOfflineCount(0);
+      return;
+    }
+
+    setSincronizandoOffline(true);
+
+    const { error } = await supabase
+      .from(MOVIMIENTOS_TABLE)
+      .insert(pendientes);
+
+    if (error) {
+      setSincronizandoOffline(false);
+      if (!esErrorDeConexion(error.message)) {
+        mostrarErrorSupabase(error.message);
+      }
+      return;
+    }
+
+    writePendingMovimientos(userId, []);
+    setPendientesOfflineCount(0);
+    await cargarMovimientos();
+    await cargarHistorialAhorro();
+    setSincronizandoOffline(false);
+  }
+
   function obtenerMensajeErrorLogin(error: {
     message: string;
     details?: string;
@@ -501,12 +664,27 @@ export default function App() {
         usuario: payload.usuario ?? loginUser,
         esAdmin: payload.es_admin === true || (payload.usuario ?? loginUser).trim().toLowerCase() === 'admin',
       };
+
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+
+      if (recordarDispositivo) {
+        const expiresAt = new Date(Date.now() + REMEMBER_SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+        const remembered: RememberedAuthSession = {
+          ...sessionData,
+          expiresAt,
+        };
+        localStorage.setItem(SESSION_REMEMBER_KEY, JSON.stringify(remembered));
+      } else {
+        localStorage.removeItem(SESSION_REMEMBER_KEY);
+      }
+
       setAuthSession(sessionData);
       setIsAuthenticated(true);
       setLoginError('');
       setLoginPassword('');
       setLoginMonthlyKey('');
+      setMostrarLoginPassword(false);
+      setMostrarLoginMonthlyKey(false);
       setLoginLoading(false);
       return;
     }
@@ -517,6 +695,7 @@ export default function App() {
 
   function handleLogout() {
     sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_REMEMBER_KEY);
     setAuthSession(null);
     setIsAuthenticated(false);
     setMovimientos([]);
@@ -530,7 +709,11 @@ export default function App() {
     setLoginUser('');
     setLoginPassword('');
     setLoginMonthlyKey('');
+    setMostrarLoginPassword(false);
+    setMostrarLoginMonthlyKey(false);
     setLoginError('');
+    setPendientesOfflineCount(0);
+    setSincronizandoOffline(false);
   }
 
   function mostrarErrorSupabase(errorMessage: string) {
@@ -631,16 +814,36 @@ export default function App() {
       return alert('El monto debe ser mayor a 0');
     }
 
-    const { error } = await supabase.from(MOVIMIENTOS_TABLE).insert([{
+    const payload: PendingMovimientoInsert = {
       monto: montoNormalizado,
       descripcion,
       tipo,
       categoria_id: categoriaId,
       fecha,
       usuario_id: authUserId,
-    }]);
+    };
+
+    if (!estaOnline) {
+      agregarPendienteOffline(authUserId, payload);
+      setMonto('');
+      setDescripcion('');
+      setMostrarModalMovimiento(false);
+      alert('Sin internet: guardado localmente. Se sincronizará al reconectar.');
+      return;
+    }
+
+    const { error } = await supabase.from(MOVIMIENTOS_TABLE).insert([payload]);
 
     if (error) {
+      if (esErrorDeConexion(error.message)) {
+        agregarPendienteOffline(authUserId, payload);
+        setMonto('');
+        setDescripcion('');
+        setMostrarModalMovimiento(false);
+        alert('No hay conexión estable. El registro quedó guardado localmente y se sincronizará luego.');
+        return;
+      }
+
       mostrarErrorSupabase(error.message);
     } else {
       setMonto('');
@@ -672,18 +875,36 @@ export default function App() {
       return;
     }
 
-    const { error } = await supabase.from(MOVIMIENTOS_TABLE).insert([
-      {
-        monto: montoNormalizado,
-        descripcion: ahorroDescripcion.trim() || (ahorroOperacion === 'AHORRO' ? 'Ahorro' : 'Retiro de ahorro'),
-        tipo: ahorroOperacion === 'AHORRO' ? 'INGRESO' : 'GASTO',
-        categoria_id: categoriaAhorro.id,
-        fecha: ahorroFecha,
-        usuario_id: authUserId,
-      },
-    ]);
+    const payload: PendingMovimientoInsert = {
+      monto: montoNormalizado,
+      descripcion: ahorroDescripcion.trim() || (ahorroOperacion === 'AHORRO' ? 'Ahorro' : 'Retiro de ahorro'),
+      tipo: ahorroOperacion === 'AHORRO' ? 'INGRESO' : 'GASTO',
+      categoria_id: categoriaAhorro.id,
+      fecha: ahorroFecha,
+      usuario_id: authUserId,
+    };
+
+    if (!estaOnline) {
+      agregarPendienteOffline(authUserId, payload);
+      setAhorroMonto('');
+      setAhorroDescripcion(ahorroOperacion === 'AHORRO' ? 'Ahorro' : 'Retiro de ahorro');
+      setAhorroFecha(format(new Date(), 'yyyy-MM-dd'));
+      alert('Sin internet: ahorro guardado localmente. Se sincronizará al reconectar.');
+      return;
+    }
+
+    const { error } = await supabase.from(MOVIMIENTOS_TABLE).insert([payload]);
 
     if (error) {
+      if (esErrorDeConexion(error.message)) {
+        agregarPendienteOffline(authUserId, payload);
+        setAhorroMonto('');
+        setAhorroDescripcion(ahorroOperacion === 'AHORRO' ? 'Ahorro' : 'Retiro de ahorro');
+        setAhorroFecha(format(new Date(), 'yyyy-MM-dd'));
+        alert('No hay conexión estable. El ahorro quedó guardado localmente y se sincronizará luego.');
+        return;
+      }
+
       mostrarErrorSupabase(error.message);
       return;
     }
@@ -1664,26 +1885,54 @@ export default function App() {
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">Contraseña</label>
-              <input
-                type="password"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="••••••••"
-                autoComplete="current-password"
-              />
+              <div className="relative">
+                <input
+                  type={mostrarLoginPassword ? 'text' : 'password'}
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full px-3 py-2 pr-20 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarLoginPassword((prev) => !prev)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-blue-700 font-medium hover:text-blue-900"
+                >
+                  {mostrarLoginPassword ? 'Ocultar' : 'Mostrar'}
+                </button>
+              </div>
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">Clave mensual</label>
-              <input
-                type="password"
-                value={loginMonthlyKey}
-                onChange={(e) => setLoginMonthlyKey(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="Clave de pago vigente"
-                autoComplete="one-time-code"
-              />
+              <div className="relative">
+                <input
+                  type={mostrarLoginMonthlyKey ? 'text' : 'password'}
+                  value={loginMonthlyKey}
+                  onChange={(e) => setLoginMonthlyKey(e.target.value)}
+                  className="w-full px-3 py-2 pr-20 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="Clave de pago vigente"
+                  autoComplete="one-time-code"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarLoginMonthlyKey((prev) => !prev)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-blue-700 font-medium hover:text-blue-900"
+                >
+                  {mostrarLoginMonthlyKey ? 'Ocultar' : 'Mostrar'}
+                </button>
+              </div>
             </div>
+
+            <label className="flex items-start gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={recordarDispositivo}
+                onChange={(e) => setRecordarDispositivo(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>Recordar este dispositivo por 30 días</span>
+            </label>
 
             {loginError && <p className="text-sm text-red-600">{loginError}</p>}
 
@@ -1706,6 +1955,17 @@ export default function App() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Control de Gastos</h1>
           <div className="text-xs sm:text-sm text-gray-500 mt-1">Sesión: {authUsuario}</div>
+          <div className="text-xs mt-1 flex flex-wrap items-center gap-2">
+            <span className={`px-2 py-0.5 rounded-full ${estaOnline ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+              {estaOnline ? 'Online' : 'Offline'}
+            </span>
+            {sincronizandoOffline && (
+              <span className="text-blue-700">Sincronizando datos...</span>
+            )}
+            {!sincronizandoOffline && pendientesOfflineCount > 0 && (
+              <span className="text-amber-700">Pendientes por sincronizar: {pendientesOfflineCount}</span>
+            )}
+          </div>
         </div>
         <div className="no-print flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
