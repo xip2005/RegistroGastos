@@ -207,7 +207,13 @@ export default function App() {
   const [filtroTipoHistorial, setFiltroTipoHistorial] = useState<FiltroTipoHistorial>('TODOS');
   const [mostrarModalMovimiento, setMostrarModalMovimiento] = useState(false);
   const [mostrarPresupuesto, setMostrarPresupuesto] = useState(false);
-  const [mostrarHistorialDetalle, setMostrarHistorialDetalle] = useState(true);
+  const [mostrarHistorialDetalle, setMostrarHistorialDetalle] = useState(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+
+    return window.innerWidth >= 640;
+  });
   const [presupuestoIngresoBase, setPresupuestoIngresoBase] = useState('');
   const [deudaInicialTarjeta, setDeudaInicialTarjeta] = useState('1.997.217');
   const [limiteTarjeta, setLimiteTarjeta] = useState('2.200.000');
@@ -1206,7 +1212,7 @@ export default function App() {
                   onClick={() => setMostrarHistorialDetalle((prev) => !prev)}
                   className="px-3 py-2 rounded border border-gray-200 hover:bg-gray-50 text-sm"
                 >
-                  {mostrarHistorialDetalle ? 'Ocultar detalle' : 'Mostrar detalle'}
+                  {mostrarHistorialDetalle ? 'Ocultar filtros' : 'Mostrar filtros'}
                 </button>
 
                 {mostrarHistorialDetalle && (
@@ -1288,63 +1294,61 @@ export default function App() {
                 )}
 
                 {!mostrarHistorialDetalle && (
-                  <div className="w-full text-sm text-gray-500">Detalle oculto para navegación rápida. Toca “Mostrar detalle”.</div>
+                  <div className="w-full text-sm text-gray-500">Filtros ocultos para vista rápida. Toca “Mostrar filtros”.</div>
                 )}
               </div>
 
-              {mostrarHistorialDetalle && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
-                  {movimientosFiltrados.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">
-                      No hay movimientos en este periodo
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-gray-100">
-                      {movimientosFiltrados.map(mov => {
-                        const Icon = mov.categorias ? (iconMap[mov.categorias.icono] || <HelpCircle className="w-5 h-5" />) : <HelpCircle className="w-5 h-5" />;
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
+                {movimientosFiltrados.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">
+                    No hay movimientos en este periodo
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {movimientosFiltrados.map(mov => {
+                      const Icon = mov.categorias ? (iconMap[mov.categorias.icono] || <HelpCircle className="w-5 h-5" />) : <HelpCircle className="w-5 h-5" />;
 
-                        return (
-                          <div key={mov.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-gray-50 transition">
-                            <div className="flex items-start gap-3 sm:gap-4 min-w-0">
-                              <div className={`p-2 rounded-full bg-gray-100`}>
-                                {Icon}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-medium text-gray-800 break-words">{mov.descripcion}</p>
-                                <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-0.5">
-                                  <span>{format(new Date(mov.fecha + 'T00:00:00'), 'dd MMM yyyy')}</span>
-                                  <span>•</span>
-                                  <span>{mov.categorias?.nombre || 'Sin categoría'}</span>
-                                </div>
-                              </div>
+                      return (
+                        <div key={mov.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:hover:bg-gray-50 transition">
+                          <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+                            <div className={`p-2 rounded-full bg-gray-100`}>
+                              {Icon}
                             </div>
-
-                            <div className="w-full sm:w-auto flex items-center justify-end gap-4">
-                              <span className={`font-semibold ${mov.tipo === 'INGRESO' ? 'text-emerald-600' : 'text-gray-800'}`}>
-                                {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGs(mov.monto)}
-                              </span>
-                              <button
-                                onClick={() => moverMovimientoAAhorro(mov)}
-                                className="text-gray-400 hover:text-sky-600 p-1 no-print"
-                                title="Mover a ahorro"
-                              >
-                                <PiggyBank size={16} />
-                              </button>
-                              <button
-                                onClick={() => eliminarMovimiento(mov.id)}
-                                className="text-gray-400 hover:text-red-500 p-1 no-print"
-                                title="Eliminar"
-                              >
-                                <Trash2 size={16} />
-                              </button>
+                            <div className="min-w-0">
+                              <p className="font-medium text-gray-800 break-words">{mov.descripcion}</p>
+                              <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-0.5">
+                                <span>{format(new Date(mov.fecha + 'T00:00:00'), 'dd MMM yyyy')}</span>
+                                <span>•</span>
+                                <span>{mov.categorias?.nombre || 'Sin categoría'}</span>
+                              </div>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
+
+                          <div className="w-full sm:w-auto flex items-center justify-end gap-4">
+                            <span className={`font-semibold ${mov.tipo === 'INGRESO' ? 'text-emerald-600' : 'text-gray-800'}`}>
+                              {mov.tipo === 'INGRESO' ? '+' : '-'}{formatGs(mov.monto)}
+                            </span>
+                            <button
+                              onClick={() => moverMovimientoAAhorro(mov)}
+                              className="text-gray-400 hover:text-sky-600 p-1 no-print"
+                              title="Mover a ahorro"
+                            >
+                              <PiggyBank size={16} />
+                            </button>
+                            <button
+                              onClick={() => eliminarMovimiento(mov.id)}
+                              className="text-gray-400 hover:text-red-500 p-1 no-print"
+                              title="Eliminar"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

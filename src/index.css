@@ -10,6 +10,10 @@ body,
   min-height: 100%;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   background-color: #f3f4f6;
@@ -20,6 +24,14 @@ body {
 .mobile-scroll-x {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+button,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
 }
 
 @media (max-width: 640px) {
@@ -28,6 +40,11 @@ body {
   textarea,
   button {
     font-size: 16px;
+  }
+
+  input[type='date'],
+  input[type='month'] {
+    min-width: 150px;
   }
 
   input,
