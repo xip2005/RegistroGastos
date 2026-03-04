@@ -54,9 +54,8 @@ const ADMIN_CLEAR_MONTHLY_KEY_RPC = 'fin_admin_clear_clave_mensual';
 const ADMIN_GET_MONTHLY_KEY_RPC = 'fin_admin_get_clave_mensual';
 const ADMIN_DELETE_USER_RPC = 'fin_admin_delete_usuario';
 const APP_BUILD = 'build-2026-03-04-01';
-const DEUDA_INICIAL_TARJETA_KEY = 'registrogastos_deuda_inicial_tarjeta';
-const LIMITE_TARJETA_KEY = 'registrogastos_limite_tarjeta';
-const MOVIMIENTOS_TARJETA_KEY = 'registrogastos_movimientos_tarjeta';
+const TARJETA_CONFIG_TABLE = 'fin_tarjeta_config';
+const TARJETA_MOVIMIENTOS_TABLE = 'fin_tarjeta_movimientos';
 const PRESUPUESTO_INGRESO_BASE_KEY = 'registrogastos_presupuesto_ingreso_base';
 const ADMIN_CLAVES_GENERADAS_KEY = 'registrogastos_admin_claves_generadas';
 
@@ -189,6 +188,14 @@ function formatGsInputFromDigits(rawValue: string) {
   return gsInputFormatter.format(Number(digitsOnly));
 }
 
+function formatGsInputFromNumber(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return '';
+  }
+
+  return gsInputFormatter.format(Math.round(value));
+}
+
 function parseGsInputToNumber(value: string) {
   const normalized = value.replace(/\./g, '').replace(',', '.').trim();
   const parsed = Number(normalized);
@@ -269,6 +276,7 @@ export default function App() {
   const [tarjetaDescripcion, setTarjetaDescripcion] = useState('');
   const [tarjetaFecha, setTarjetaFecha] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [mesTarjeta, setMesTarjeta] = useState(format(new Date(), 'yyyy-MM'));
+  const [tarjetaCargada, setTarjetaCargada] = useState(false);
   const [resumenCierreMes, setResumenCierreMes] = useState<null | {
     mes: string;
     gastos: number;
@@ -316,51 +324,41 @@ export default function App() {
       return;
     }
 
-    const deudaGuardada = localStorage.getItem(getScopedStorageKey(DEUDA_INICIAL_TARJETA_KEY, authUserId));
-    const limiteGuardado = localStorage.getItem(getScopedStorageKey(LIMITE_TARJETA_KEY, authUserId));
+    setTarjetaCargada(false);
     const presupuestoGuardado = localStorage.getItem(getScopedStorageKey(PRESUPUESTO_INGRESO_BASE_KEY, authUserId));
-    const movimientosTarjetaGuardados = localStorage.getItem(getScopedStorageKey(MOVIMIENTOS_TARJETA_KEY, authUserId));
 
-    setDeudaInicialTarjeta(deudaGuardada ?? '1.997.217');
-    setLimiteTarjeta(limiteGuardado ?? '2.200.000');
     setPresupuestoIngresoBase(presupuestoGuardado ?? '');
-
-    if (!movimientosTarjetaGuardados) {
-      setMovimientosTarjeta([]);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(movimientosTarjetaGuardados) as MovimientoTarjeta[];
-      setMovimientosTarjeta(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setMovimientosTarjeta([]);
-    }
+    cargarTarjeta();
   }, [isAuthenticated, authUserId]);
 
   useEffect(() => {
-    if (!isAuthenticated || !authUserId) {
+    if (!isAuthenticated || !authUserId || !tarjetaCargada) {
       return;
     }
 
-    localStorage.setItem(getScopedStorageKey(DEUDA_INICIAL_TARJETA_KEY, authUserId), deudaInicialTarjeta);
-  }, [isAuthenticated, authUserId, deudaInicialTarjeta]);
+    const guardar = async () => {
+      const deudaNumero = deudaInicialTarjeta ? parseGsInputToNumber(deudaInicialTarjeta) : 0;
+      const limiteNumero = limiteTarjeta ? parseGsInputToNumber(limiteTarjeta) : 0;
 
-  useEffect(() => {
-    if (!isAuthenticated || !authUserId) {
-      return;
-    }
+      const { error } = await supabase
+        .from(TARJETA_CONFIG_TABLE)
+        .upsert(
+          [{
+            usuario_id: authUserId,
+            deuda_inicial: deudaNumero,
+            limite: limiteNumero,
+            updated_at: new Date().toISOString(),
+          }],
+          { onConflict: 'usuario_id' },
+        );
 
-    localStorage.setItem(getScopedStorageKey(LIMITE_TARJETA_KEY, authUserId), limiteTarjeta);
-  }, [isAuthenticated, authUserId, limiteTarjeta]);
+      if (error) {
+        mostrarErrorSupabase(error.message);
+      }
+    };
 
-  useEffect(() => {
-    if (!isAuthenticated || !authUserId) {
-      return;
-    }
-
-    localStorage.setItem(getScopedStorageKey(MOVIMIENTOS_TARJETA_KEY, authUserId), JSON.stringify(movimientosTarjeta));
-  }, [isAuthenticated, authUserId, movimientosTarjeta]);
+    void guardar();
+  }, [isAuthenticated, authUserId, tarjetaCargada, deudaInicialTarjeta, limiteTarjeta]);
 
   useEffect(() => {
     if (!isAuthenticated || !authUserId) {
@@ -369,6 +367,44 @@ export default function App() {
 
     localStorage.setItem(getScopedStorageKey(PRESUPUESTO_INGRESO_BASE_KEY, authUserId), presupuestoIngresoBase);
   }, [isAuthenticated, authUserId, presupuestoIngresoBase]);
+
+  async function cargarTarjeta() {
+    if (!authUserId) {
+      setDeudaInicialTarjeta('1.997.217');
+      setLimiteTarjeta('2.200.000');
+      setMovimientosTarjeta([]);
+      setTarjetaCargada(true);
+      return;
+    }
+
+    const { data: configData, error: configError } = await supabase
+      .from(TARJETA_CONFIG_TABLE)
+      .select('deuda_inicial, limite')
+      .eq('usuario_id', authUserId)
+      .maybeSingle();
+
+    if (configError) {
+      mostrarErrorSupabase(configError.message);
+      return;
+    }
+
+    setDeudaInicialTarjeta(formatGsInputFromNumber(Number(configData?.deuda_inicial ?? 1997217)));
+    setLimiteTarjeta(formatGsInputFromNumber(Number(configData?.limite ?? 2200000)));
+
+    const { data: movimientosData, error: movimientosError } = await supabase
+      .from(TARJETA_MOVIMIENTOS_TABLE)
+      .select('id, tipo, monto, descripcion, fecha')
+      .eq('usuario_id', authUserId)
+      .order('fecha', { ascending: false });
+
+    if (movimientosError) {
+      mostrarErrorSupabase(movimientosError.message);
+      return;
+    }
+
+    setMovimientosTarjeta((movimientosData ?? []) as MovimientoTarjeta[]);
+    setTarjetaCargada(true);
+  }
 
   useEffect(() => {
     if (!isAuthenticated || !authUserId || !isAdmin || vistaActiva !== 'ADMIN') {
@@ -490,6 +526,11 @@ export default function App() {
   function mostrarErrorSupabase(errorMessage: string) {
     if (errorMessage.includes(`Could not find the table 'public.${MOVIMIENTOS_TABLE}'`)) {
       alert(`Falta crear la tabla ${MOVIMIENTOS_TABLE} en Supabase. Ejecuta el script SQL que te dejé en sql/setup_fin_movimientos.sql y vuelve a intentar.`);
+      return;
+    }
+
+    if (errorMessage.includes(`Could not find the table 'public.${TARJETA_CONFIG_TABLE}'`) || errorMessage.includes(`Could not find the table 'public.${TARJETA_MOVIMIENTOS_TABLE}'`)) {
+      alert('Falta migración de tarjeta por usuario. Ejecuta sql/setup_multiusuario_y_mensualidad.sql y vuelve a intentar.');
       return;
     }
 
@@ -771,8 +812,13 @@ export default function App() {
     cargarHistorialAhorro();
   }
 
-  function guardarMovimientoTarjeta(e: React.FormEvent) {
+  async function guardarMovimientoTarjeta(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!authUserId) {
+      alert('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
 
     const montoNormalizado = parseGsInputToNumber(tarjetaMonto);
     if (!tarjetaMonto || Number.isNaN(montoNormalizado) || montoNormalizado <= 0) {
@@ -780,29 +826,58 @@ export default function App() {
       return;
     }
 
-    const nuevo: MovimientoTarjeta = {
+    const nuevo = {
       id: crypto.randomUUID(),
+      usuario_id: authUserId,
       tipo: tarjetaTipo,
       monto: montoNormalizado,
       descripcion: tarjetaDescripcion.trim() || (tarjetaTipo === 'GASTO' ? 'Consumo de tarjeta' : 'Pago de tarjeta'),
       fecha: tarjetaFecha,
     };
 
-    setMovimientosTarjeta((prev) => [nuevo, ...prev]);
+    const { error } = await supabase.from(TARJETA_MOVIMIENTOS_TABLE).insert([nuevo]);
+
+    if (error) {
+      mostrarErrorSupabase(error.message);
+      return;
+    }
+
+    await cargarTarjeta();
     setTarjetaMonto('');
     setTarjetaDescripcion('');
     setTarjetaFecha(format(new Date(), 'yyyy-MM-dd'));
   }
 
-  function eliminarMovimientoTarjeta(id: string) {
+  async function eliminarMovimientoTarjeta(id: string) {
+    if (!authUserId) {
+      alert('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
+
     if (!confirm('¿Eliminar este movimiento de tarjeta?')) {
       return;
     }
 
-    setMovimientosTarjeta((prev) => prev.filter((mov) => mov.id !== id));
+    const { error } = await supabase
+      .from(TARJETA_MOVIMIENTOS_TABLE)
+      .delete()
+      .eq('id', id)
+      .eq('usuario_id', authUserId);
+
+    if (error) {
+      mostrarErrorSupabase(error.message);
+      return;
+    }
+
+    await cargarTarjeta();
   }
 
-  function editarDescripcionMovimientoTarjeta(id: string, descripcionActual: string) {
+  async function editarDescripcionMovimientoTarjeta(id: string, descripcionActual: string) {
+    if (!authUserId) {
+      alert('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
+
     const nuevaDescripcion = prompt('Editar observación de tarjeta', descripcionActual);
 
     if (nuevaDescripcion === null) {
@@ -815,16 +890,26 @@ export default function App() {
       return;
     }
 
-    setMovimientosTarjeta((prev) =>
-      prev.map((mov) =>
-        mov.id === id
-          ? { ...mov, descripcion: descripcionNormalizada }
-          : mov,
-      ),
-    );
+    const { error } = await supabase
+      .from(TARJETA_MOVIMIENTOS_TABLE)
+      .update({ descripcion: descripcionNormalizada })
+      .eq('id', id)
+      .eq('usuario_id', authUserId);
+
+    if (error) {
+      mostrarErrorSupabase(error.message);
+      return;
+    }
+
+    await cargarTarjeta();
   }
 
-  function editarMontoMovimientoTarjeta(id: string, montoActual: number) {
+  async function editarMontoMovimientoTarjeta(id: string, montoActual: number) {
+    if (!authUserId) {
+      alert('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
+
     const montoSugerido = gsInputFormatter.format(Math.round(montoActual));
     const nuevoMonto = prompt('Editar monto de tarjeta', montoSugerido);
 
@@ -838,13 +923,18 @@ export default function App() {
       return;
     }
 
-    setMovimientosTarjeta((prev) =>
-      prev.map((mov) =>
-        mov.id === id
-          ? { ...mov, monto: montoNormalizado }
-          : mov,
-      ),
-    );
+    const { error } = await supabase
+      .from(TARJETA_MOVIMIENTOS_TABLE)
+      .update({ monto: montoNormalizado })
+      .eq('id', id)
+      .eq('usuario_id', authUserId);
+
+    if (error) {
+      mostrarErrorSupabase(error.message);
+      return;
+    }
+
+    await cargarTarjeta();
   }
 
   const categoriaAhorro = obtenerCategoriaAhorro();
@@ -1471,16 +1561,61 @@ export default function App() {
       }
 
       if (backup.tarjeta) {
-        setDeudaInicialTarjeta(backup.tarjeta.deudaInicial || deudaInicialTarjeta);
-        setLimiteTarjeta(backup.tarjeta.limite || limiteTarjeta);
-        if (Array.isArray(backup.tarjeta.movimientos)) {
-          setMovimientosTarjeta(backup.tarjeta.movimientos);
+        const deudaImportada = backup.tarjeta.deudaInicial ? parseGsInputToNumber(backup.tarjeta.deudaInicial) : 0;
+        const limiteImportado = backup.tarjeta.limite ? parseGsInputToNumber(backup.tarjeta.limite) : 0;
+
+        const { error: configTarjetaError } = await supabase
+          .from(TARJETA_CONFIG_TABLE)
+          .upsert(
+            [{
+              usuario_id: authUserId,
+              deuda_inicial: deudaImportada,
+              limite: limiteImportado,
+              updated_at: new Date().toISOString(),
+            }],
+            { onConflict: 'usuario_id' },
+          );
+
+        if (configTarjetaError) {
+          mostrarErrorSupabase(configTarjetaError.message);
+          return;
+        }
+
+        const { error: deleteTarjetaError } = await supabase
+          .from(TARJETA_MOVIMIENTOS_TABLE)
+          .delete()
+          .eq('usuario_id', authUserId);
+
+        if (deleteTarjetaError) {
+          mostrarErrorSupabase(deleteTarjetaError.message);
+          return;
+        }
+
+        if (Array.isArray(backup.tarjeta.movimientos) && backup.tarjeta.movimientos.length > 0) {
+          const movimientosTarjetaImportados = backup.tarjeta.movimientos.map((movimiento) => ({
+            id: movimiento.id,
+            usuario_id: authUserId,
+            tipo: movimiento.tipo,
+            monto: movimiento.monto,
+            descripcion: movimiento.descripcion,
+            fecha: movimiento.fecha,
+          }));
+
+          const { error: insertTarjetaError } = await supabase
+            .from(TARJETA_MOVIMIENTOS_TABLE)
+            .insert(movimientosTarjetaImportados);
+
+          if (insertTarjetaError) {
+            mostrarErrorSupabase(insertTarjetaError.message);
+            return;
+          }
         }
       }
 
       await cargarCategorias();
       await cargarMovimientos();
       await cargarHistorialAhorro();
+      await cargarTarjeta();
       alert('Backup importado correctamente.');
     } catch {
       alert('No se pudo leer el backup. Verifica que sea un JSON válido.');

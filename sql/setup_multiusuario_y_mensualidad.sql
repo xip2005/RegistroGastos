@@ -54,6 +54,32 @@ create index if not exists fin_movimientos_usuario_fecha_idx
 create index if not exists fin_movimientos_usuario_categoria_idx
   on public.fin_movimientos (usuario_id, categoria_id);
 
+create table if not exists public.fin_tarjeta_config (
+  usuario_id uuid primary key
+    references public.fin_usuarios(id)
+    on update cascade
+    on delete cascade,
+  deuda_inicial numeric not null default 0,
+  limite numeric not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.fin_tarjeta_movimientos (
+  id uuid primary key default gen_random_uuid(),
+  usuario_id uuid not null
+    references public.fin_usuarios(id)
+    on update cascade
+    on delete cascade,
+  tipo text not null check (tipo in ('GASTO', 'PAGO')),
+  monto numeric not null check (monto > 0),
+  descripcion text not null,
+  fecha date not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists fin_tarjeta_movimientos_usuario_fecha_idx
+  on public.fin_tarjeta_movimientos (usuario_id, fecha desc);
+
 drop function if exists public.fin_login_multi(text, text, text);
 
 create or replace function public.fin_login_multi(
@@ -262,6 +288,7 @@ begin
     true,
     'ACTIVO',
     extensions.crypt(v_clave, extensions.gen_salt('bf')),
+    v_clave,
     coalesce(p_es_admin, false),
     (
       case

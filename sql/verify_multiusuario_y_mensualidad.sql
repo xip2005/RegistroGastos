@@ -13,6 +13,13 @@ where table_schema = 'public'
   and table_name = 'fin_movimientos'
   and column_name = 'usuario_id';
 
+-- 2.1) Verifica tablas de tarjeta por usuario
+select table_name
+from information_schema.tables
+where table_schema = 'public'
+  and table_name in ('fin_tarjeta_config', 'fin_tarjeta_movimientos')
+order by table_name;
+
 -- 3) Verifica función de login multi
 select
   n.nspname as schema,
