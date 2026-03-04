@@ -301,6 +301,7 @@ export default function App() {
   const [adminNuevoPassword, setAdminNuevoPassword] = useState('');
   const [adminNuevoMeses, setAdminNuevoMeses] = useState('1');
   const [adminNuevoEsAdmin, setAdminNuevoEsAdmin] = useState(false);
+  const [mostrarSoporteModal, setMostrarSoporteModal] = useState(false);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -1731,6 +1732,14 @@ export default function App() {
             <span className="hidden sm:inline">Imprimir</span>
           </button>
           <button
+            onClick={() => setMostrarSoporteModal(true)}
+            className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-100 transition text-sm font-medium"
+            title="Ayuda rápida"
+          >
+            <HelpCircle size={16} />
+            Soporte
+          </button>
+          <button
             onClick={handleLogout}
             className="bg-red-50 text-red-700 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-red-100 transition text-sm"
             title="Cerrar sesión"
@@ -1780,6 +1789,53 @@ export default function App() {
           </button>
         )}
       </div>
+
+      {mostrarSoporteModal && (
+        <div className="no-print fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-gray-100 p-4 sm:p-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-gray-900">Ayuda rápida</h3>
+              <button
+                type="button"
+                onClick={() => setMostrarSoporteModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+                title="Cerrar ayuda"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-3 text-sm text-gray-700">
+              <p className="text-gray-600">Pasos simples para usar la app:</p>
+              <ol className="list-decimal pl-5 space-y-2">
+                <li>
+                  Para registrar un gasto o ingreso, toca <span className="font-semibold">Nuevo registro</span> (botón azul flotante).
+                </li>
+                <li>
+                  Para cargar tu salario, ve a <span className="font-semibold">Presupuesto sugerido</span> y completa <span className="font-semibold">Salario mensual (ingreso base)</span>.
+                </li>
+                <li>
+                  Usa las pestañas <span className="font-semibold">Gastos e Ingresos</span>, <span className="font-semibold">Ahorro</span> y <span className="font-semibold">Tarjeta</span> para cada tipo de control.
+                </li>
+                <li>
+                  Para respaldo, usa <span className="font-semibold">Exportar</span> y <span className="font-semibold">Importar</span> arriba.
+                </li>
+              </ol>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-800">
+                Si algo no te deja avanzar, cerrá sesión y entrá de nuevo. Si continúa, contactá al administrador.
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setMostrarSoporteModal(false)}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium"
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {vistaActiva === 'MOVIMIENTOS' && (
         <>
