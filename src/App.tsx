@@ -725,7 +725,6 @@ export default function App() {
 
   function handleLogout() {
     sessionStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(SESSION_REMEMBER_KEY);
     setAuthSession(null);
     setIsAuthenticated(false);
     setMovimientos([]);
