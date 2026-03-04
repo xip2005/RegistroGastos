@@ -218,6 +218,41 @@ function parseGsInputToNumber(value: string) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function readRememberedAuthSession(): AuthSession | null {
+  const rawRemember = localStorage.getItem(SESSION_REMEMBER_KEY);
+
+  if (!rawRemember) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawRemember) as Partial<RememberedAuthSession>;
+    const expiresAt = typeof parsed.expiresAt === 'string' ? Date.parse(parsed.expiresAt) : Number.NaN;
+
+    if (
+      parsed.ok === true
+      && typeof parsed.userId === 'string'
+      && parsed.userId
+      && typeof parsed.usuario === 'string'
+      && Number.isFinite(expiresAt)
+      && expiresAt > Date.now()
+    ) {
+      return {
+        ok: true,
+        userId: parsed.userId,
+        usuario: parsed.usuario,
+        esAdmin: parsed.esAdmin === true,
+      };
+    }
+
+    localStorage.removeItem(SESSION_REMEMBER_KEY);
+  } catch {
+    localStorage.removeItem(SESSION_REMEMBER_KEY);
+  }
+
+  return null;
+}
+
 function readAuthSession(): AuthSession | null {
   const rawSession = sessionStorage.getItem(SESSION_KEY);
 
@@ -237,38 +272,10 @@ function readAuthSession(): AuthSession | null {
     }
   }
 
-  const rawRemember = localStorage.getItem(SESSION_REMEMBER_KEY);
-
-  if (!rawRemember) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(rawRemember) as Partial<RememberedAuthSession>;
-    const expiresAt = typeof parsed.expiresAt === 'string' ? Date.parse(parsed.expiresAt) : Number.NaN;
-
-    if (
-      parsed.ok === true
-      && typeof parsed.userId === 'string'
-      && parsed.userId
-      && typeof parsed.usuario === 'string'
-      && Number.isFinite(expiresAt)
-      && expiresAt > Date.now()
-    ) {
-      const auth: AuthSession = {
-        ok: true,
-        userId: parsed.userId,
-        usuario: parsed.usuario,
-        esAdmin: parsed.esAdmin === true,
-      };
-
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(auth));
-      return auth;
-    }
-
-    localStorage.removeItem(SESSION_REMEMBER_KEY);
-  } catch {
-    localStorage.removeItem(SESSION_REMEMBER_KEY);
+  const remembered = readRememberedAuthSession();
+  if (remembered) {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(remembered));
+    return remembered;
   }
 
   return null;
@@ -642,6 +649,29 @@ export default function App() {
     e.preventDefault();
     setLoginError('');
     setLoginLoading(true);
+
+    if (!estaOnline) {
+      const remembered = readRememberedAuthSession();
+      const usuarioIngresado = loginUser.trim().toLowerCase();
+      const usuarioRecordado = remembered?.usuario.trim().toLowerCase() ?? '';
+
+      if (remembered && usuarioIngresado !== '' && usuarioIngresado === usuarioRecordado) {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify(remembered));
+        setAuthSession(remembered);
+        setIsAuthenticated(true);
+        setLoginError('');
+        setLoginPassword('');
+        setLoginMonthlyKey('');
+        setMostrarLoginPassword(false);
+        setMostrarLoginMonthlyKey(false);
+        setLoginLoading(false);
+        return;
+      }
+
+      setLoginError('Sin conexión. Para entrar offline, usa el usuario recordado en este dispositivo (primero debes haber iniciado sesión online al menos una vez).');
+      setLoginLoading(false);
+      return;
+    }
 
     const { data, error } = await supabase.rpc(LOGIN_RPC, {
       p_usuario: loginUser,
