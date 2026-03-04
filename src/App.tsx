@@ -601,6 +601,40 @@ export default function App() {
     cargarHistorialAhorro();
   }
 
+  async function editarMontoMovimiento(movimiento: Movimiento) {
+    if (!authUserId) {
+      alert('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
+
+    const montoSugerido = gsInputFormatter.format(Math.round(movimiento.monto));
+    const nuevoMonto = prompt('Editar monto', montoSugerido);
+
+    if (nuevoMonto === null) {
+      return;
+    }
+
+    const montoNormalizado = parseGsInputToNumber(nuevoMonto);
+    if (!nuevoMonto.trim() || Number.isNaN(montoNormalizado) || montoNormalizado <= 0) {
+      alert('El monto debe ser mayor a 0.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from(MOVIMIENTOS_TABLE)
+      .update({ monto: montoNormalizado })
+      .eq('id', movimiento.id)
+      .eq('usuario_id', authUserId);
+
+    if (error) {
+      mostrarErrorSupabase(error.message);
+      return;
+    }
+
+    cargarMovimientos();
+    cargarHistorialAhorro();
+  }
+
   async function moverMovimientoAAhorro(movimiento: Movimiento) {
     if (!authUserId) {
       alert('Sesión inválida. Vuelve a iniciar sesión.');
@@ -688,6 +722,29 @@ export default function App() {
       prev.map((mov) =>
         mov.id === id
           ? { ...mov, descripcion: descripcionNormalizada }
+          : mov,
+      ),
+    );
+  }
+
+  function editarMontoMovimientoTarjeta(id: string, montoActual: number) {
+    const montoSugerido = gsInputFormatter.format(Math.round(montoActual));
+    const nuevoMonto = prompt('Editar monto de tarjeta', montoSugerido);
+
+    if (nuevoMonto === null) {
+      return;
+    }
+
+    const montoNormalizado = parseGsInputToNumber(nuevoMonto);
+    if (!nuevoMonto.trim() || Number.isNaN(montoNormalizado) || montoNormalizado <= 0) {
+      alert('El monto debe ser mayor a 0.');
+      return;
+    }
+
+    setMovimientosTarjeta((prev) =>
+      prev.map((mov) =>
+        mov.id === id
+          ? { ...mov, monto: montoNormalizado }
           : mov,
       ),
     );
@@ -1396,6 +1453,13 @@ export default function App() {
                                 <PiggyBank size={16} />
                               </button>
                               <button
+                                onClick={() => editarMontoMovimiento(mov)}
+                                className="text-gray-400 hover:text-emerald-600 p-1 shrink-0"
+                                title="Editar monto"
+                              >
+                                <span className="inline-flex h-4 w-4 items-center justify-center text-xs font-bold leading-none">₲</span>
+                              </button>
+                              <button
                                 onClick={() => editarDescripcionMovimiento(mov)}
                                 className="text-gray-400 hover:text-blue-600 p-1 shrink-0"
                                 title="Editar observación"
@@ -1656,6 +1720,13 @@ export default function App() {
                         </div>
                         <div className="flex items-center gap-2 no-print shrink-0">
                           <button
+                            onClick={() => editarMontoMovimiento(mov)}
+                            className="text-gray-400 hover:text-emerald-600 p-1 shrink-0"
+                            title="Editar monto"
+                          >
+                            <span className="inline-flex h-4 w-4 items-center justify-center text-xs font-bold leading-none">₲</span>
+                          </button>
+                          <button
                             onClick={() => editarDescripcionMovimiento(mov)}
                             className="text-gray-400 hover:text-blue-600 p-1 shrink-0"
                             title="Editar observación"
@@ -1841,6 +1912,13 @@ export default function App() {
                           </span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => editarMontoMovimientoTarjeta(mov.id, mov.monto)}
+                            className="text-gray-400 hover:text-emerald-600 p-1 shrink-0"
+                            title="Editar monto de tarjeta"
+                          >
+                            <span className="inline-flex h-4 w-4 items-center justify-center text-xs font-bold leading-none">₲</span>
+                          </button>
                           <button
                             onClick={() => editarDescripcionMovimientoTarjeta(mov.id, mov.descripcion)}
                             className="text-gray-400 hover:text-blue-600 p-1 shrink-0"
