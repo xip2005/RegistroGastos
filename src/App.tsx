@@ -268,8 +268,8 @@ export default function App() {
     return window.innerWidth >= 640;
   });
   const [presupuestoIngresoBase, setPresupuestoIngresoBase] = useState('');
-  const [deudaInicialTarjeta, setDeudaInicialTarjeta] = useState('1.997.217');
-  const [limiteTarjeta, setLimiteTarjeta] = useState('2.200.000');
+  const [deudaInicialTarjeta, setDeudaInicialTarjeta] = useState('');
+  const [limiteTarjeta, setLimiteTarjeta] = useState('');
   const [movimientosTarjeta, setMovimientosTarjeta] = useState<MovimientoTarjeta[]>([]);
   const [tarjetaTipo, setTarjetaTipo] = useState<TarjetaTipo>('GASTO');
   const [tarjetaMonto, setTarjetaMonto] = useState('');
@@ -325,6 +325,9 @@ export default function App() {
     }
 
     setTarjetaCargada(false);
+    setDeudaInicialTarjeta('');
+    setLimiteTarjeta('');
+    setMovimientosTarjeta([]);
     const presupuestoGuardado = localStorage.getItem(getScopedStorageKey(PRESUPUESTO_INGRESO_BASE_KEY, authUserId));
 
     setPresupuestoIngresoBase(presupuestoGuardado ?? '');
@@ -370,8 +373,8 @@ export default function App() {
 
   async function cargarTarjeta() {
     if (!authUserId) {
-      setDeudaInicialTarjeta('1.997.217');
-      setLimiteTarjeta('2.200.000');
+      setDeudaInicialTarjeta('');
+      setLimiteTarjeta('');
       setMovimientosTarjeta([]);
       setTarjetaCargada(true);
       return;
@@ -388,8 +391,8 @@ export default function App() {
       return;
     }
 
-    setDeudaInicialTarjeta(formatGsInputFromNumber(Number(configData?.deuda_inicial ?? 1997217)));
-    setLimiteTarjeta(formatGsInputFromNumber(Number(configData?.limite ?? 2200000)));
+    setDeudaInicialTarjeta(formatGsInputFromNumber(Number(configData?.deuda_inicial ?? 0)));
+    setLimiteTarjeta(formatGsInputFromNumber(Number(configData?.limite ?? 0)));
 
     const { data: movimientosData, error: movimientosError } = await supabase
       .from(TARJETA_MOVIMIENTOS_TABLE)
