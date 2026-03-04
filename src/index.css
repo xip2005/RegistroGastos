@@ -26,6 +26,67 @@ body {
   overflow-x: hidden;
 }
 
+body.dark-mode {
+  background-color: #0b1220;
+  color: #e5e7eb;
+}
+
+body.dark-mode .bg-gray-100 {
+  background-color: #0b1220 !important;
+}
+
+body.dark-mode .bg-white,
+body.dark-mode .bg-slate-100,
+body.dark-mode .bg-gray-50 {
+  background-color: #111827 !important;
+}
+
+body.dark-mode .bg-blue-50 {
+  background-color: #172554 !important;
+}
+
+body.dark-mode .bg-red-50 {
+  background-color: #450a0a !important;
+}
+
+body.dark-mode .border,
+body.dark-mode .border-gray-100,
+body.dark-mode .border-gray-200,
+body.dark-mode .border-slate-200 {
+  border-color: #374151 !important;
+}
+
+body.dark-mode .text-gray-800,
+body.dark-mode .text-gray-700,
+body.dark-mode .text-slate-800 {
+  color: #f3f4f6 !important;
+}
+
+body.dark-mode .text-gray-600,
+body.dark-mode .text-gray-500,
+body.dark-mode .text-gray-400 {
+  color: #9ca3af !important;
+}
+
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea {
+  background-color: #0f172a !important;
+  color: #e5e7eb !important;
+  border-color: #475569 !important;
+}
+
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+body.dark-mode .hover\:bg-gray-50:hover,
+body.dark-mode .hover\:bg-gray-100:hover,
+body.dark-mode .hover\:bg-slate-200:hover {
+  background-color: #1f2937 !important;
+}
+
 .mobile-scroll-x {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;

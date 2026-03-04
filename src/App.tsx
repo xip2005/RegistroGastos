@@ -18,7 +18,9 @@ import {
   PiggyBank,    // SAVINGS
   DollarSign,   // ATTACH_MONEY
   Pencil,
-  HelpCircle
+  HelpCircle,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subDays } from 'date-fns';
 
@@ -65,6 +67,7 @@ const OFFLINE_CACHE_CATEGORIAS_KEY = 'registrogastos_offline_cache_categorias';
 const OFFLINE_CACHE_MOVIMIENTOS_KEY = 'registrogastos_offline_cache_movimientos';
 const OFFLINE_CACHE_AHORRO_KEY = 'registrogastos_offline_cache_ahorro';
 const OFFLINE_CACHE_TARJETA_KEY = 'registrogastos_offline_cache_tarjeta';
+const THEME_MODE_KEY = 'registrogastos_theme_mode';
 
 type AuthSession = {
   ok: true;
@@ -228,6 +231,23 @@ function parseGsInputToNumber(value: string) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function readThemeMode() {
+  if (typeof window === 'undefined') {
+    return 'light';
+  }
+
+  const saved = localStorage.getItem(THEME_MODE_KEY);
+  if (saved === 'dark' || saved === 'light') {
+    return saved;
+  }
+
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    return 'dark';
+  }
+
+  return 'light';
+}
+
 function readRememberedAuthSession(): AuthSession | null {
   const rawRemember = localStorage.getItem(SESSION_REMEMBER_KEY);
 
@@ -367,6 +387,7 @@ export default function App() {
   const [mostrarLoginPassword, setMostrarLoginPassword] = useState(false);
   const [mostrarLoginMonthlyKey, setMostrarLoginMonthlyKey] = useState(false);
   const [recordarDispositivo, setRecordarDispositivo] = useState(true);
+  const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => readThemeMode());
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -434,6 +455,19 @@ export default function App() {
   const [pendientesOfflineCount, setPendientesOfflineCount] = useState(0);
   const [sincronizandoOffline, setSincronizandoOffline] = useState(false);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    document.body.classList.toggle('dark-mode', themeMode === 'dark');
+    localStorage.setItem(THEME_MODE_KEY, themeMode);
+  }, [themeMode]);
+
+  function toggleThemeMode() {
+    setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  }
 
   useEffect(() => {
     if (!isAuthenticated || !authUserId) {
@@ -2009,6 +2043,16 @@ export default function App() {
           </div>
           <h1 className="text-2xl font-bold text-gray-800 text-center">Registro de Gastos</h1>
           <p className="text-sm text-gray-500 text-center mt-1 mb-5">Inicia sesión para continuar</p>
+          <div className="flex justify-center mb-4">
+            <button
+              type="button"
+              onClick={toggleThemeMode}
+              className="px-3 py-2 rounded-lg border border-gray-200 text-sm flex items-center gap-2 hover:bg-gray-50"
+            >
+              {themeMode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              {themeMode === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+            </button>
+          </div>
 
           <form onSubmit={handleLogin} className="space-y-3">
             <div>
@@ -2107,6 +2151,14 @@ export default function App() {
           </div>
         </div>
         <div className="no-print flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={toggleThemeMode}
+            className="bg-slate-100 text-slate-800 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-200 transition text-sm"
+            title={themeMode === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          >
+            {themeMode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            {themeMode === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+          </button>
           <button
             onClick={exportarBackup}
             className="bg-slate-100 text-slate-800 px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-200 transition text-sm"
