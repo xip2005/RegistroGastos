@@ -3,6 +3,7 @@ create extension if not exists pgcrypto;
 alter table public.fin_usuarios
   add column if not exists estado_pago text not null default 'ACTIVO',
   add column if not exists clave_mensual_hash text,
+  add column if not exists es_admin boolean not null default false,
   add column if not exists pago_hasta date,
   add column if not exists updated_at timestamptz not null default now();
 
@@ -52,6 +53,8 @@ create index if not exists fin_movimientos_usuario_fecha_idx
 create index if not exists fin_movimientos_usuario_categoria_idx
   on public.fin_movimientos (usuario_id, categoria_id);
 
+drop function if exists public.fin_login_multi(text, text, text);
+
 create or replace function public.fin_login_multi(
   p_usuario text,
   p_password text,
@@ -62,6 +65,7 @@ returns table (
   user_id uuid,
   usuario text,
   estado_pago text,
+  es_admin boolean,
   mensaje text
 )
 language plpgsql
@@ -78,39 +82,43 @@ begin
   limit 1;
 
   if not found then
-    return query select false, null::uuid, null::text, null::text, 'Usuario no encontrado';
+    return query select false, null::uuid, null::text, null::text, false, 'Usuario no encontrado';
     return;
   end if;
 
   if v_usuario.activo = false then
-    return query select false, null::uuid, v_usuario.usuario, v_usuario.estado_pago, 'Usuario inactivo';
+    return query select false, null::uuid, v_usuario.usuario, v_usuario.estado_pago, coalesce(v_usuario.es_admin, false), 'Usuario inactivo';
     return;
   end if;
 
   if v_usuario.password_hash <> extensions.crypt(p_password, v_usuario.password_hash) then
-    return query select false, null::uuid, v_usuario.usuario, v_usuario.estado_pago, 'Usuario o contraseña incorrectos';
+    return query select false, null::uuid, v_usuario.usuario, v_usuario.estado_pago, coalesce(v_usuario.es_admin, false), 'Usuario o contraseña incorrectos';
     return;
   end if;
 
   if coalesce(v_usuario.estado_pago, 'ACTIVO') <> 'ACTIVO' then
-    return query select false, null::uuid, v_usuario.usuario, v_usuario.estado_pago, 'Mensualidad pendiente. Contacta al administrador.';
-    return;
+    if coalesce(v_usuario.es_admin, false) = false then
+      return query select false, null::uuid, v_usuario.usuario, v_usuario.estado_pago, false, 'Mensualidad pendiente. Contacta al administrador.';
+      return;
+    end if;
   end if;
 
   if v_usuario.pago_hasta is null or v_usuario.pago_hasta < current_date then
-    update public.fin_usuarios
-    set
-      estado_pago = 'MOROSO',
-      updated_at = now()
-    where id = v_usuario.id;
+    if coalesce(v_usuario.es_admin, false) = false then
+      update public.fin_usuarios
+      set
+        estado_pago = 'MOROSO',
+        updated_at = now()
+      where id = v_usuario.id;
 
-    return query select false, null::uuid, v_usuario.usuario, 'MOROSO'::text, 'Mensualidad vencida. Contacta al administrador.';
-    return;
+      return query select false, null::uuid, v_usuario.usuario, 'MOROSO'::text, false, 'Mensualidad vencida. Contacta al administrador.';
+      return;
+    end if;
   end if;
 
   if coalesce(v_usuario.clave_mensual_hash, '') <> ''
      and v_usuario.clave_mensual_hash <> extensions.crypt(coalesce(p_clave_mensual, ''), v_usuario.clave_mensual_hash) then
-    return query select false, null::uuid, v_usuario.usuario, v_usuario.estado_pago, 'Clave mensual inválida';
+    return query select false, null::uuid, v_usuario.usuario, v_usuario.estado_pago, coalesce(v_usuario.es_admin, false), 'Clave mensual inválida';
     return;
   end if;
 
@@ -118,7 +126,7 @@ begin
   set updated_at = now()
   where id = v_usuario.id;
 
-  return query select true, v_usuario.id, v_usuario.usuario, v_usuario.estado_pago, 'OK';
+  return query select true, v_usuario.id, v_usuario.usuario, v_usuario.estado_pago, coalesce(v_usuario.es_admin, false), 'OK';
 end;
 $$;
 
@@ -185,6 +193,74 @@ $$;
 
 grant execute on function public.fin_renovar_mensualidad(text, text, integer) to anon, authenticated;
 
+create or replace function public.fin_admin_list_usuarios()
+returns table (
+  id uuid,
+  usuario text,
+  estado_pago text,
+  pago_hasta date,
+  es_admin boolean,
+  activo boolean,
+  updated_at timestamptz
+)
+language sql
+security definer
+set search_path = public, extensions
+as $$
+  select
+    u.id,
+    u.usuario,
+    coalesce(u.estado_pago, 'ACTIVO') as estado_pago,
+    u.pago_hasta,
+    coalesce(u.es_admin, false) as es_admin,
+    coalesce(u.activo, true) as activo,
+    u.updated_at
+  from public.fin_usuarios u
+  order by lower(u.usuario);
+$$;
+
+grant execute on function public.fin_admin_list_usuarios() to anon, authenticated;
+
+create or replace function public.fin_admin_set_estado_pago(
+  p_usuario text,
+  p_estado text,
+  p_pago_hasta date default null
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_rows integer;
+  v_estado text := upper(trim(coalesce(p_estado, '')));
+begin
+  if v_estado not in ('ACTIVO', 'MOROSO') then
+    raise exception 'Estado inválido. Usa ACTIVO o MOROSO';
+  end if;
+
+  update public.fin_usuarios
+  set
+    estado_pago = v_estado,
+    pago_hasta = case when p_pago_hasta is not null then p_pago_hasta else pago_hasta end,
+    updated_at = now()
+  where lower(usuario) = lower(trim(p_usuario));
+
+  get diagnostics v_rows = row_count;
+  return v_rows > 0;
+end;
+$$;
+
+grant execute on function public.fin_admin_set_estado_pago(text, text, date) to anon, authenticated;
+
+update public.fin_usuarios
+set
+  es_admin = true,
+  estado_pago = 'ACTIVO',
+  pago_hasta = coalesce(pago_hasta, current_date + interval '120 months')::date,
+  updated_at = now()
+where lower(usuario) = 'admin';
+
 -- Ejemplos rápidos de administración:
 -- Marcar mensualidad pendiente:
 -- update public.fin_usuarios set estado_pago = 'MOROSO' where lower(usuario) = lower('cliente1');
@@ -194,3 +270,6 @@ grant execute on function public.fin_renovar_mensualidad(text, text, integer) to
 --
 -- Renovar mensualidad (1 mes) y actualizar clave mensual:
 -- select public.fin_renovar_mensualidad('cliente1', 'CLAVE-ABR-2026', 1);
+--
+-- Marcar creador como admin (si usas otro usuario distinto a Admin):
+-- update public.fin_usuarios set es_admin = true, estado_pago = 'ACTIVO' where lower(usuario) = lower('tu_usuario');

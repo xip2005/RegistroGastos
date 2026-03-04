@@ -41,11 +41,14 @@ type Movimiento = {
 
 type FiltroTipoHistorial = 'TODOS' | 'GASTO' | 'INGRESO';
 type OperacionAhorro = 'AHORRO' | 'RETIRO';
-type VistaPrincipal = 'MOVIMIENTOS' | 'AHORRO' | 'TARJETA';
+type VistaPrincipal = 'MOVIMIENTOS' | 'AHORRO' | 'TARJETA' | 'ADMIN';
 type TarjetaTipo = 'GASTO' | 'PAGO';
 const MOVIMIENTOS_TABLE = 'fin_movimientos';
 const SESSION_KEY = 'registrogastos_auth';
 const LOGIN_RPC = 'fin_login_multi';
+const ADMIN_LIST_USERS_RPC = 'fin_admin_list_usuarios';
+const ADMIN_SET_ESTADO_RPC = 'fin_admin_set_estado_pago';
+const RENOVAR_RPC = 'fin_renovar_mensualidad';
 const APP_BUILD = 'build-2026-03-04-01';
 const DEUDA_INICIAL_TARJETA_KEY = 'registrogastos_deuda_inicial_tarjeta';
 const LIMITE_TARJETA_KEY = 'registrogastos_limite_tarjeta';
@@ -56,6 +59,7 @@ type AuthSession = {
   ok: true;
   userId: string;
   usuario: string;
+  esAdmin: boolean;
 };
 
 type LoginRpcResponse = {
@@ -63,7 +67,18 @@ type LoginRpcResponse = {
   user_id: string | null;
   usuario: string | null;
   estado_pago: string | null;
+  es_admin?: boolean | null;
   mensaje: string | null;
+};
+
+type UsuarioAdmin = {
+  id: string;
+  usuario: string;
+  estado_pago: string;
+  pago_hasta: string | null;
+  es_admin: boolean;
+  activo: boolean;
+  updated_at: string;
 };
 
 type MovimientoTarjeta = {
@@ -169,6 +184,7 @@ function readAuthSession(): AuthSession | null {
         ok: true,
         userId: parsed.userId,
         usuario: parsed.usuario,
+        esAdmin: parsed.esAdmin === true,
       };
     }
   } catch {
@@ -187,6 +203,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => readAuthSession() !== null);
   const authUserId = authSession?.userId ?? null;
   const authUsuario = authSession?.usuario ?? '';
+  const isAdmin = authSession?.esAdmin ?? false;
   const [loginUser, setLoginUser] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginMonthlyKey, setLoginMonthlyKey] = useState('');
@@ -240,6 +257,11 @@ export default function App() {
   const [fechaAhorroInicio, setFechaAhorroInicio] = useState(format(startOfMonth(subDays(new Date(), 59)), 'yyyy-MM-dd'));
   const [fechaAhorroFin, setFechaAhorroFin] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [vistaActiva, setVistaActiva] = useState<VistaPrincipal>('MOVIMIENTOS');
+  const [usuariosAdmin, setUsuariosAdmin] = useState<UsuarioAdmin[]>([]);
+  const [adminError, setAdminError] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminProcesando, setAdminProcesando] = useState(false);
+  const [adminMesesRenovacion, setAdminMesesRenovacion] = useState('1');
   const backupInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -318,6 +340,14 @@ export default function App() {
     localStorage.setItem(getScopedStorageKey(PRESUPUESTO_INGRESO_BASE_KEY, authUserId), presupuestoIngresoBase);
   }, [isAuthenticated, authUserId, presupuestoIngresoBase]);
 
+  useEffect(() => {
+    if (!isAuthenticated || !authUserId || !isAdmin || vistaActiva !== 'ADMIN') {
+      return;
+    }
+
+    cargarUsuariosAdmin();
+  }, [isAuthenticated, authUserId, isAdmin, vistaActiva]);
+
   function obtenerMensajeErrorLogin(error: {
     message: string;
     details?: string;
@@ -364,6 +394,7 @@ export default function App() {
         ok: true,
         userId: payload.user_id,
         usuario: payload.usuario ?? loginUser,
+        esAdmin: payload.es_admin === true || (payload.usuario ?? loginUser).trim().toLowerCase() === 'admin',
       };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
       setAuthSession(sessionData);
@@ -386,6 +417,9 @@ export default function App() {
     setMovimientos([]);
     setHistorialAhorro([]);
     setMovimientosTarjeta([]);
+    setUsuariosAdmin([]);
+    setAdminError('');
+    setVistaActiva('MOVIMIENTOS');
     setLoginUser('');
     setLoginPassword('');
     setLoginMonthlyKey('');
@@ -886,6 +920,152 @@ export default function App() {
     });
   }
 
+  function generarClaveMensual() {
+    const periodo = format(new Date(), 'MMyyyy');
+    const random = Math.floor(1000 + Math.random() * 9000);
+    return `CLAVE-${periodo}-${random}`;
+  }
+
+  function obtenerMesesRenovacion() {
+    const parsed = Number.parseInt(adminMesesRenovacion.replace(/\D/g, ''), 10);
+    return Number.isNaN(parsed) ? 1 : Math.max(parsed, 1);
+  }
+
+  async function cargarUsuariosAdmin() {
+    if (!isAdmin) {
+      return;
+    }
+
+    setAdminLoading(true);
+    setAdminError('');
+
+    const { data, error } = await supabase.rpc(ADMIN_LIST_USERS_RPC);
+
+    if (error) {
+      const textoError = [error.message, error.details, error.hint, error.code]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      if (error.code === 'PGRST202' || textoError.includes(ADMIN_LIST_USERS_RPC)) {
+        setAdminError('Falta crear función admin en DB. Ejecuta sql/setup_multiusuario_y_mensualidad.sql.');
+      } else {
+        setAdminError(`No se pudo cargar usuarios: ${error.message}`);
+      }
+
+      setAdminLoading(false);
+      return;
+    }
+
+    setUsuariosAdmin(Array.isArray(data) ? (data as UsuarioAdmin[]) : []);
+    setAdminLoading(false);
+  }
+
+  async function renovarUsuarioConNuevaClave(usuario: string) {
+    if (!isAdmin) {
+      return;
+    }
+
+    setAdminProcesando(true);
+    const meses = obtenerMesesRenovacion();
+    const nuevaClave = generarClaveMensual();
+
+    const { data, error } = await supabase.rpc(RENOVAR_RPC, {
+      p_usuario: usuario,
+      p_nueva_clave: nuevaClave,
+      p_meses: meses,
+    });
+
+    if (error || data !== true) {
+      setAdminProcesando(false);
+      alert(`No se pudo renovar a ${usuario}.`);
+      return;
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(`${usuario}: ${nuevaClave}`);
+    }
+
+    alert(`Renovado ${usuario} por ${meses} mes(es).\nClave nueva: ${nuevaClave}\nSe copió al portapapeles.`);
+    await cargarUsuariosAdmin();
+    setAdminProcesando(false);
+  }
+
+  async function marcarUsuarioMoroso(usuario: string) {
+    if (!isAdmin) {
+      return;
+    }
+
+    const confirmar = confirm(`¿Marcar a ${usuario} como MOROSO?`);
+    if (!confirmar) {
+      return;
+    }
+
+    setAdminProcesando(true);
+    const { data, error } = await supabase.rpc(ADMIN_SET_ESTADO_RPC, {
+      p_usuario: usuario,
+      p_estado: 'MOROSO',
+      p_pago_hasta: null,
+    });
+
+    if (error || data !== true) {
+      setAdminProcesando(false);
+      alert(`No se pudo actualizar estado de ${usuario}.`);
+      return;
+    }
+
+    await cargarUsuariosAdmin();
+    setAdminProcesando(false);
+  }
+
+  async function renovarTodosUsuarios() {
+    if (!isAdmin) {
+      return;
+    }
+
+    const meses = obtenerMesesRenovacion();
+    const elegibles = usuariosAdmin.filter((usuario) => !usuario.es_admin && usuario.activo);
+
+    if (elegibles.length === 0) {
+      alert('No hay usuarios elegibles para renovar.');
+      return;
+    }
+
+    const confirmar = confirm(`Se regenerarán claves para ${elegibles.length} usuario(s) por ${meses} mes(es). ¿Continuar?`);
+    if (!confirmar) {
+      return;
+    }
+
+    setAdminProcesando(true);
+    const lineasExito: string[] = [];
+    const lineasError: string[] = [];
+
+    for (const usuario of elegibles) {
+      const nuevaClave = generarClaveMensual();
+      const { data, error } = await supabase.rpc(RENOVAR_RPC, {
+        p_usuario: usuario.usuario,
+        p_nueva_clave: nuevaClave,
+        p_meses: meses,
+      });
+
+      if (error || data !== true) {
+        lineasError.push(usuario.usuario);
+      } else {
+        lineasExito.push(`${usuario.usuario}: ${nuevaClave}`);
+      }
+    }
+
+    if (lineasExito.length > 0 && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(lineasExito.join('\n'));
+    }
+
+    await cargarUsuariosAdmin();
+    setAdminProcesando(false);
+
+    const resumenErrores = lineasError.length > 0 ? `\nCon error: ${lineasError.join(', ')}` : '';
+    alert(`Renovados: ${lineasExito.length}.\nLas claves renovadas se copiaron al portapapeles.${resumenErrores}`);
+  }
+
   async function exportarBackup() {
     if (!authUserId) {
       alert('Sesión inválida. Vuelve a iniciar sesión.');
@@ -1163,6 +1343,15 @@ export default function App() {
         >
           Tarjeta
         </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => setVistaActiva('ADMIN')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition flex-1 sm:flex-none ${vistaActiva === 'ADMIN' ? 'bg-slate-800 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+          >
+            Admin
+          </button>
+        )}
       </div>
 
       {vistaActiva === 'MOVIMIENTOS' && (
@@ -1961,6 +2150,95 @@ export default function App() {
                 </div>
               )}
             </div>
+          </div>
+        </>
+      )}
+
+      {vistaActiva === 'ADMIN' && isAdmin && (
+        <>
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 no-print">
+            <div className="flex flex-wrap items-center gap-2 justify-between">
+              <h2 className="text-lg font-semibold text-slate-800">Gestión de usuarios</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-sm text-gray-600">Meses a renovar</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={adminMesesRenovacion}
+                  onChange={(e) => setAdminMesesRenovacion(e.target.value.replace(/\D/g, '') || '1')}
+                  className="w-20 border px-2 py-1.5 rounded"
+                />
+                <button
+                  type="button"
+                  onClick={cargarUsuariosAdmin}
+                  disabled={adminLoading || adminProcesando}
+                  className="px-3 py-2 rounded border border-gray-200 hover:bg-gray-50 text-sm disabled:opacity-60"
+                >
+                  Recargar
+                </button>
+                <button
+                  type="button"
+                  onClick={renovarTodosUsuarios}
+                  disabled={adminLoading || adminProcesando}
+                  className="px-3 py-2 rounded bg-slate-800 text-white text-sm hover:bg-slate-700 disabled:opacity-60"
+                >
+                  Regenerar claves de todos
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Renovar genera una clave nueva, activa el usuario y extiende su pago por los meses indicados.</p>
+            {adminError && <p className="mt-3 text-sm text-red-600">{adminError}</p>}
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden no-print">
+            {adminLoading ? (
+              <div className="p-5 text-sm text-gray-500">Cargando usuarios...</div>
+            ) : usuariosAdmin.length === 0 ? (
+              <div className="p-5 text-sm text-gray-500">No hay usuarios para mostrar.</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {usuariosAdmin.map((usuario) => (
+                  <div key={`admin-${usuario.id}`} className="p-4 flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="font-semibold text-gray-800">{usuario.usuario}</div>
+                        <div className="text-xs text-gray-500">
+                          Vence: {usuario.pago_hasta ? format(new Date(usuario.pago_hasta + 'T00:00:00'), 'dd/MM/yyyy') : 'Sin fecha'}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className={`px-2 py-1 rounded-full ${usuario.estado_pago === 'ACTIVO' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          {usuario.estado_pago}
+                        </span>
+                        {usuario.es_admin && <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700">ADMIN</span>}
+                        {!usuario.activo && <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-700">INACTIVO</span>}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => renovarUsuarioConNuevaClave(usuario.usuario)}
+                        disabled={adminProcesando}
+                        className="px-3 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        Renovar + generar clave
+                      </button>
+                      {!usuario.es_admin && (
+                        <button
+                          type="button"
+                          onClick={() => marcarUsuarioMoroso(usuario.usuario)}
+                          disabled={adminProcesando}
+                          className="px-3 py-2 rounded border border-red-200 text-red-700 text-sm hover:bg-red-50 disabled:opacity-60"
+                        >
+                          Marcar moroso
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}

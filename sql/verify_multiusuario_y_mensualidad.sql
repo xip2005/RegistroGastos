@@ -3,7 +3,7 @@ select column_name, data_type
 from information_schema.columns
 where table_schema = 'public'
   and table_name = 'fin_usuarios'
-  and column_name in ('estado_pago', 'clave_mensual_hash', 'pago_hasta', 'updated_at')
+  and column_name in ('estado_pago', 'clave_mensual_hash', 'es_admin', 'pago_hasta', 'updated_at')
 order by column_name;
 
 -- 2) Verifica columna usuario_id en movimientos
@@ -23,5 +23,20 @@ join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
   and p.proname = 'fin_login_multi';
 
--- 4) Prueba login multi (reemplaza por usuario real y clave mensual real)
+-- 4) Verifica funciones admin
+select
+  n.nspname as schema,
+  p.proname as function_name,
+  pg_get_function_identity_arguments(p.oid) as args
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname in ('fin_admin_list_usuarios', 'fin_admin_set_estado_pago', 'fin_renovar_mensualidad')
+order by p.proname;
+
+-- 5) Prueba login multi (reemplaza por usuario real y clave mensual real)
 -- select * from public.fin_login_multi('Admin', 'pablo123', 'TU-CLAVE-MENSUAL');
+
+-- 6) Pruebas admin
+-- select * from public.fin_admin_list_usuarios();
+-- select public.fin_admin_set_estado_pago('cliente1', 'MOROSO', null);
