@@ -61,6 +61,10 @@ const TARJETA_MOVIMIENTOS_TABLE = 'fin_tarjeta_movimientos';
 const PRESUPUESTO_INGRESO_BASE_KEY = 'registrogastos_presupuesto_ingreso_base';
 const ADMIN_CLAVES_GENERADAS_KEY = 'registrogastos_admin_claves_generadas';
 const OFFLINE_PENDING_MOVIMIENTOS_KEY = 'registrogastos_offline_pending_movimientos';
+const OFFLINE_CACHE_CATEGORIAS_KEY = 'registrogastos_offline_cache_categorias';
+const OFFLINE_CACHE_MOVIMIENTOS_KEY = 'registrogastos_offline_cache_movimientos';
+const OFFLINE_CACHE_AHORRO_KEY = 'registrogastos_offline_cache_ahorro';
+const OFFLINE_CACHE_TARJETA_KEY = 'registrogastos_offline_cache_tarjeta';
 
 type AuthSession = {
   ok: true;
@@ -127,6 +131,12 @@ type PendingMovimientoInsert = {
   categoria_id: string;
   fecha: string;
   usuario_id: string;
+};
+
+type OfflineTarjetaCache = {
+  deudaInicial: string;
+  limite: string;
+  movimientos: MovimientoTarjeta[];
 };
 
 type BackupPayload = {
@@ -287,6 +297,36 @@ function getScopedStorageKey(baseKey: string, userId: string) {
 
 function getPendingMovimientosKey(userId: string) {
   return getScopedStorageKey(OFFLINE_PENDING_MOVIMIENTOS_KEY, userId);
+}
+
+function getMovimientosCacheKey(userId: string) {
+  return getScopedStorageKey(OFFLINE_CACHE_MOVIMIENTOS_KEY, userId);
+}
+
+function getAhorroCacheKey(userId: string) {
+  return getScopedStorageKey(OFFLINE_CACHE_AHORRO_KEY, userId);
+}
+
+function getTarjetaCacheKey(userId: string) {
+  return getScopedStorageKey(OFFLINE_CACHE_TARJETA_KEY, userId);
+}
+
+function readJsonCache<T>(key: string, fallbackValue: T): T {
+  const raw = localStorage.getItem(key);
+  if (!raw) {
+    return fallbackValue;
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    localStorage.removeItem(key);
+    return fallbackValue;
+  }
+}
+
+function writeJsonCache<T>(key: string, value: T) {
+  localStorage.setItem(key, JSON.stringify(value));
 }
 
 function readPendingMovimientos(userId: string): PendingMovimientoInsert[] {
@@ -482,6 +522,19 @@ export default function App() {
       .maybeSingle();
 
     if (configError) {
+      if (esErrorDeConexion(configError.message)) {
+        const cachedTarjeta = readJsonCache<OfflineTarjetaCache>(
+          getTarjetaCacheKey(authUserId),
+          { deudaInicial: '', limite: '', movimientos: [] },
+        );
+        setDeudaInicialTarjeta(cachedTarjeta.deudaInicial);
+        setLimiteTarjeta(cachedTarjeta.limite);
+        setMovimientosTarjeta(cachedTarjeta.movimientos ?? []);
+        setTarjetaCargadaUsuarioId(authUserId);
+        setTarjetaCargada(true);
+        return;
+      }
+
       mostrarErrorSupabase(configError.message);
       return;
     }
@@ -496,11 +549,30 @@ export default function App() {
       .order('fecha', { ascending: false });
 
     if (movimientosError) {
+      if (esErrorDeConexion(movimientosError.message)) {
+        const cachedTarjeta = readJsonCache<OfflineTarjetaCache>(
+          getTarjetaCacheKey(authUserId),
+          { deudaInicial: '', limite: '', movimientos: [] },
+        );
+        setDeudaInicialTarjeta(cachedTarjeta.deudaInicial);
+        setLimiteTarjeta(cachedTarjeta.limite);
+        setMovimientosTarjeta(cachedTarjeta.movimientos ?? []);
+        setTarjetaCargadaUsuarioId(authUserId);
+        setTarjetaCargada(true);
+        return;
+      }
+
       mostrarErrorSupabase(movimientosError.message);
       return;
     }
 
-    setMovimientosTarjeta((movimientosData ?? []) as MovimientoTarjeta[]);
+    const movimientosTarjetaCache = (movimientosData ?? []) as MovimientoTarjeta[];
+    setMovimientosTarjeta(movimientosTarjetaCache);
+    writeJsonCache<OfflineTarjetaCache>(getTarjetaCacheKey(authUserId), {
+      deudaInicial: formatGsInputFromNumber(Number(configData?.deuda_inicial ?? 0)),
+      limite: formatGsInputFromNumber(Number(configData?.limite ?? 0)),
+      movimientos: movimientosTarjetaCache,
+    });
     setTarjetaCargadaUsuarioId(authUserId);
     setTarjetaCargada(true);
   }
@@ -746,6 +818,10 @@ export default function App() {
   }
 
   function mostrarErrorSupabase(errorMessage: string) {
+    if (esErrorDeConexion(errorMessage)) {
+      return;
+    }
+
     if (errorMessage.includes(`Could not find the table 'public.${MOVIMIENTOS_TABLE}'`)) {
       alert(`Falta crear la tabla ${MOVIMIENTOS_TABLE} en Supabase. Ejecuta el script SQL que te dejé en sql/setup_fin_movimientos.sql y vuelve a intentar.`);
       return;
@@ -766,9 +842,27 @@ export default function App() {
   }
 
   async function cargarCategorias() {
-    const { data } = await supabase.from('fin_categorias').select('*');
+    const { data, error } = await supabase.from('fin_categorias').select('*');
+
+    if (error) {
+      if (esErrorDeConexion(error.message)) {
+        const cachedCategorias = readJsonCache<Categoria[]>(OFFLINE_CACHE_CATEGORIAS_KEY, []);
+        if (cachedCategorias.length > 0) {
+          setCategorias(cachedCategorias);
+          if (!categoriaId && cachedCategorias[0]) {
+            setCategoriaId(cachedCategorias[0].id);
+          }
+        }
+        return;
+      }
+
+      mostrarErrorSupabase(error.message);
+      return;
+    }
+
     if (data) {
       setCategorias(data);
+      writeJsonCache<Categoria[]>(OFFLINE_CACHE_CATEGORIAS_KEY, data);
       if (data.length > 0) setCategoriaId(data[0].id);
     }
   }
@@ -794,11 +888,20 @@ export default function App() {
       .order('fecha', { ascending: false });
 
     if (error) {
+      if (esErrorDeConexion(error.message)) {
+        const cachedMovimientos = readJsonCache<Movimiento[]>(getMovimientosCacheKey(authUserId), []);
+        setMovimientos(cachedMovimientos);
+        return;
+      }
+
       mostrarErrorSupabase(error.message);
       return;
     }
 
-    if (data) setMovimientos(data);
+    if (data) {
+      setMovimientos(data);
+      writeJsonCache<Movimiento[]>(getMovimientosCacheKey(authUserId), data as Movimiento[]);
+    }
   }
 
   async function cargarHistorialAhorro() {
@@ -824,11 +927,18 @@ export default function App() {
       .order('fecha', { ascending: false });
 
     if (error) {
+      if (esErrorDeConexion(error.message)) {
+        const cachedAhorro = readJsonCache<Movimiento[]>(getAhorroCacheKey(authUserId), []);
+        setHistorialAhorro(cachedAhorro);
+        return;
+      }
+
       mostrarErrorSupabase(error.message);
       return;
     }
 
     setHistorialAhorro(data ?? []);
+    writeJsonCache<Movimiento[]>(getAhorroCacheKey(authUserId), (data ?? []) as Movimiento[]);
   }
 
   async function guardarMovimiento(e: React.FormEvent) {
