@@ -1088,41 +1088,43 @@ export default function App() {
             <div className="lg:col-span-3 space-y-4">
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center justify-between">
             <h2 className="text-lg font-semibold">Historial</h2>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <input 
-                type="date" 
-                value={fechaInicio} 
-                onChange={e => setFechaInicio(e.target.value)}
-                className="border px-2 py-1 rounded"
-              />
-              <span>a</span>
-              <input 
-                type="date" 
-                value={fechaFin} 
-                onChange={e => setFechaFin(e.target.value)}
-                className="border px-2 py-1 rounded"
-              />
-              <button
-                type="button"
-                onClick={aplicarQuincena}
-                className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
-              >
-                Últimos 15 días
-              </button>
-              <button
-                type="button"
-                onClick={aplicarEsteMes}
-                className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
-              >
-                Este mes
-              </button>
-              <button
-                type="button"
-                onClick={aplicarTodoHistorial}
-                className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
-              >
-                Todo
-              </button>
+            <div className="w-full mobile-scroll-x">
+              <div className="inline-flex items-center gap-2 text-sm min-w-max pr-1">
+                <input 
+                  type="date" 
+                  value={fechaInicio} 
+                  onChange={e => setFechaInicio(e.target.value)}
+                  className="border px-2 py-1 rounded"
+                />
+                <span>a</span>
+                <input 
+                  type="date" 
+                  value={fechaFin} 
+                  onChange={e => setFechaFin(e.target.value)}
+                  className="border px-2 py-1 rounded"
+                />
+                <button
+                  type="button"
+                  onClick={aplicarQuincena}
+                  className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
+                >
+                  Últimos 15 días
+                </button>
+                <button
+                  type="button"
+                  onClick={aplicarEsteMes}
+                  className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
+                >
+                  Este mes
+                </button>
+                <button
+                  type="button"
+                  onClick={aplicarTodoHistorial}
+                  className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
+                >
+                  Todo
+                </button>
+              </div>
             </div>
             <div className="w-full flex flex-col md:flex-row gap-2 md:items-center">
               <input
@@ -1132,7 +1134,8 @@ export default function App() {
                 placeholder="Buscar por descripción o categoría"
                 className="w-full md:max-w-sm border px-3 py-2 rounded-lg"
               />
-              <div className="flex gap-2">
+              <div className="mobile-scroll-x">
+                <div className="inline-flex gap-2 min-w-max">
                 <button
                   type="button"
                   onClick={() => setFiltroTipoHistorial('TODOS')}
@@ -1154,6 +1157,7 @@ export default function App() {
                 >
                   Ingresos
                 </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1216,7 +1220,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setMostrarModalMovimiento(true)}
-            className="no-print fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 flex items-center justify-center"
+            className="no-print fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 sm:right-6 z-40 w-14 h-14 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 flex items-center justify-center"
             title="Agregar movimiento"
           >
             <PlusCircle size={26} />
@@ -1224,7 +1228,7 @@ export default function App() {
 
           {mostrarModalMovimiento && (
             <div className="no-print fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-              <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-100 p-5">
+              <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-100 p-4 sm:p-5 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Nuevo Registro</h3>
                   <button
@@ -1405,27 +1409,29 @@ export default function App() {
             <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden no-print">
               <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-lg font-semibold text-sky-800">Historial de Ahorro</h3>
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <input
-                    type="date"
-                    value={fechaAhorroInicio}
-                    onChange={(e) => setFechaAhorroInicio(e.target.value)}
-                    className="border px-2 py-1 rounded"
-                  />
-                  <span>a</span>
-                  <input
-                    type="date"
-                    value={fechaAhorroFin}
-                    onChange={(e) => setFechaAhorroFin(e.target.value)}
-                    className="border px-2 py-1 rounded"
-                  />
-                  <button
-                    type="button"
-                    onClick={aplicarTodoHistorialAhorro}
-                    className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
-                  >
-                    Todo ahorro
-                  </button>
+                <div className="w-full mobile-scroll-x">
+                  <div className="inline-flex items-center gap-2 text-sm min-w-max pr-1">
+                    <input
+                      type="date"
+                      value={fechaAhorroInicio}
+                      onChange={(e) => setFechaAhorroInicio(e.target.value)}
+                      className="border px-2 py-1 rounded"
+                    />
+                    <span>a</span>
+                    <input
+                      type="date"
+                      value={fechaAhorroFin}
+                      onChange={(e) => setFechaAhorroFin(e.target.value)}
+                      className="border px-2 py-1 rounded"
+                    />
+                    <button
+                      type="button"
+                      onClick={aplicarTodoHistorialAhorro}
+                      className="px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50"
+                    >
+                      Todo ahorro
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1574,22 +1580,24 @@ export default function App() {
               <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-lg font-semibold text-violet-800">Historial de tarjeta</h3>
                 <div className="text-sm text-gray-500">Total general · Gastos: {formatGs(gastosTarjeta)} · Pagos: {formatGs(pagosTarjeta)}</div>
-                <div className="w-full flex flex-wrap items-center gap-2">
-                  <label className="text-sm text-gray-600">Mes:</label>
-                  <input
-                    type="month"
-                    value={mesTarjeta}
-                    onChange={(e) => setMesTarjeta(e.target.value)}
-                    className="border px-2 py-1 rounded"
-                  />
-                  <button
-                    type="button"
-                    onClick={cerrarMesTarjeta}
-                    className="px-3 py-1.5 rounded border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
-                  >
-                    Cerrar mes
-                  </button>
-                  <div className="text-sm text-gray-500">Mes seleccionado · Gastos: {formatGs(gastosTarjetaMes)} · Pagos: {formatGs(pagosTarjetaMes)}</div>
+                <div className="w-full mobile-scroll-x">
+                  <div className="inline-flex items-center gap-2 min-w-max pr-1">
+                    <label className="text-sm text-gray-600">Mes:</label>
+                    <input
+                      type="month"
+                      value={mesTarjeta}
+                      onChange={(e) => setMesTarjeta(e.target.value)}
+                      className="border px-2 py-1 rounded"
+                    />
+                    <button
+                      type="button"
+                      onClick={cerrarMesTarjeta}
+                      className="px-3 py-1.5 rounded border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
+                    >
+                      Cerrar mes
+                    </button>
+                    <div className="text-sm text-gray-500">Mes seleccionado · Gastos: {formatGs(gastosTarjetaMes)} · Pagos: {formatGs(pagosTarjetaMes)}</div>
+                  </div>
                 </div>
               </div>
 
