@@ -46,6 +46,7 @@ type TarjetaTipo = 'GASTO' | 'PAGO';
 const MOVIMIENTOS_TABLE = 'fin_movimientos';
 const SESSION_KEY = 'registrogastos_auth';
 const LOGIN_RPC = 'fin_login_multi';
+const APP_BUILD = 'build-2026-03-04-01';
 const DEUDA_INICIAL_TARJETA_KEY = 'registrogastos_deuda_inicial_tarjeta';
 const LIMITE_TARJETA_KEY = 'registrogastos_limite_tarjeta';
 const MOVIMIENTOS_TARJETA_KEY = 'registrogastos_movimientos_tarjeta';
@@ -1864,6 +1865,10 @@ export default function App() {
           </div>
         </>
       )}
+
+      <div className="no-print fixed left-2 bottom-2 z-30 text-[10px] text-gray-400 bg-white/80 px-2 py-1 rounded-md border border-gray-200">
+        {APP_BUILD}
+      </div>
 
     </div>
   );
