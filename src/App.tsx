@@ -142,6 +142,11 @@ type OfflineTarjetaCache = {
   movimientos: MovimientoTarjeta[];
 };
 
+type TopCategoriaGasto = {
+  nombre: string;
+  total: number;
+};
+
 type BackupPayload = {
   version: 1;
   exportedAt: string;
@@ -205,6 +210,10 @@ function formatGs(value: number) {
 
 function formatGsNoDecimals(value: number) {
   return gsFormatterNoDecimals.format(value);
+}
+
+function formatPercent(value: number) {
+  return `${value.toFixed(1)}%`;
 }
 
 function formatGsInputFromDigits(rawValue: string) {
@@ -1427,6 +1436,72 @@ export default function App() {
     });
   }, [categoriasPresupuesto, movimientosNoAhorro, presupuestoGastosSugeridoTotal]);
 
+  const ahora = new Date();
+  const finMesActual = endOfMonth(ahora);
+  const diasDelMes = finMesActual.getDate();
+  const diasTranscurridosMes = Math.max(1, ahora.getDate());
+  const diasRestantesMes = Math.max(0, diasDelMes - diasTranscurridosMes);
+  const promedioGastoDiario = diasTranscurridosMes > 0 ? gastosTotalesConAhorro / diasTranscurridosMes : 0;
+  const proyeccionGastoMes = promedioGastoDiario * diasDelMes;
+  const desvioProyeccionVsPresupuesto = proyeccionGastoMes - presupuestoGastosSugeridoTotal;
+  const ratioGastoIngreso = ingresos > 0 ? (gastosTotalesConAhorro / ingresos) * 100 : 0;
+  const ratioAhorroIngreso = ingresos > 0 ? (ahorroAcumulado / ingresos) * 100 : 0;
+
+  const topCategoriaGasto = useMemo<TopCategoriaGasto | null>(() => {
+    const acumulado = new Map<string, { nombre: string; total: number }>();
+
+    movimientosNoAhorro
+      .filter((mov) => mov.tipo === 'GASTO')
+      .forEach((mov) => {
+        const key = mov.categoria_id;
+        const nombre = mov.categorias?.nombre ?? 'Sin categoría';
+        const anterior = acumulado.get(key);
+        if (anterior) {
+          acumulado.set(key, { ...anterior, total: anterior.total + mov.monto });
+        } else {
+          acumulado.set(key, { nombre, total: mov.monto });
+        }
+      });
+
+    let mayor: TopCategoriaGasto | null = null;
+    acumulado.forEach((valor) => {
+      if (!mayor || valor.total > mayor.total) {
+        mayor = valor;
+      }
+    });
+
+    return mayor;
+  }, [movimientosNoAhorro]);
+
+  const saludFinanciera = balance >= 0 && ratioGastoIngreso <= 85
+    ? { etiqueta: 'Saludable', clase: 'bg-emerald-100 text-emerald-700' }
+    : balance >= 0
+      ? { etiqueta: 'En observación', clase: 'bg-amber-100 text-amber-700' }
+      : { etiqueta: 'Riesgo alto', clase: 'bg-red-100 text-red-700' };
+
+  const sugerenciasAsistente: string[] = [];
+  if (ratioGastoIngreso > 95) {
+    sugerenciasAsistente.push('Tu gasto ya supera el 95% de tus ingresos. Conviene frenar consumos no esenciales hoy.');
+  } else if (ratioGastoIngreso > 85) {
+    sugerenciasAsistente.push('Tu gasto está alto para esta etapa del mes. Revisa las 2 categorías más pesadas.');
+  } else {
+    sugerenciasAsistente.push('Vas bien con el ritmo del mes. Mantén este nivel de gasto para cerrar en verde.');
+  }
+
+  if (desvioProyeccionVsPresupuesto > 0) {
+    sugerenciasAsistente.push(`Si mantienes este ritmo, cerrarías ${formatGsNoDecimals(desvioProyeccionVsPresupuesto)} por encima del presupuesto sugerido.`);
+  } else {
+    sugerenciasAsistente.push(`Proyección mensual en control: ${formatGsNoDecimals(Math.abs(desvioProyeccionVsPresupuesto))} por debajo del presupuesto sugerido.`);
+  }
+
+  if (topCategoriaGasto) {
+    sugerenciasAsistente.push(`Tu mayor fuga actual es ${topCategoriaGasto.nombre} (${formatGsNoDecimals(topCategoriaGasto.total)}).`);
+  }
+
+  if (deudaTarjetaNumero > 0 && saldoDisponible < deudaTarjetaNumero) {
+    sugerenciasAsistente.push(`Necesitas ${formatGsNoDecimals(faltanteTarjeta)} adicionales para cubrir la deuda de tarjeta.`);
+  }
+
   const movimientosTarjetaMes = movimientosTarjeta.filter((mov) => mov.fecha.startsWith(mesTarjeta));
   const gastosTarjetaMes = movimientosTarjetaMes
     .filter((mov) => mov.tipo === 'GASTO')
@@ -2346,6 +2421,53 @@ export default function App() {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h2 className="text-lg font-semibold">Reporte ejecutivo del balance</h2>
+                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${saludFinanciera.clase}`}>
+                  {saludFinanciera.etiqueta}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="rounded-lg border border-gray-100 p-3 bg-gray-50">
+                  <div className="text-xs text-gray-500">% gasto sobre ingresos</div>
+                  <div className="text-lg font-semibold text-gray-800">{formatPercent(ratioGastoIngreso)}</div>
+                </div>
+                <div className="rounded-lg border border-gray-100 p-3 bg-gray-50">
+                  <div className="text-xs text-gray-500">% ahorro neto</div>
+                  <div className={`text-lg font-semibold ${ratioAhorroIngreso >= 20 ? 'text-emerald-600' : 'text-amber-600'}`}>{formatPercent(ratioAhorroIngreso)}</div>
+                </div>
+                <div className="rounded-lg border border-gray-100 p-3 bg-gray-50">
+                  <div className="text-xs text-gray-500">Proyección de gasto mensual</div>
+                  <div className="text-lg font-semibold text-gray-800">{formatGsNoDecimals(proyeccionGastoMes)}</div>
+                </div>
+                <div className="rounded-lg border border-gray-100 p-3 bg-gray-50">
+                  <div className="text-xs text-gray-500">Días restantes del mes</div>
+                  <div className="text-lg font-semibold text-gray-800">{diasRestantesMes}</div>
+                </div>
+              </div>
+              <div className="mt-3 text-sm text-gray-600">
+                Cierre proyectado: <span className={`font-semibold ${desvioProyeccionVsPresupuesto > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                  {desvioProyeccionVsPresupuesto > 0 ? `+${formatGsNoDecimals(desvioProyeccionVsPresupuesto)}` : `-${formatGsNoDecimals(Math.abs(desvioProyeccionVsPresupuesto))}`}
+                </span>{' '}
+                frente al presupuesto sugerido.
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <h2 className="text-lg font-semibold mb-2">Asistente inteligente</h2>
+              <div className="text-xs text-gray-500 mb-2">Recomendaciones automáticas según tu mes actual</div>
+              <ul className="space-y-2 text-sm text-gray-700">
+                {sugerenciasAsistente.slice(0, 4).map((sugerencia, index) => (
+                  <li key={`sugerencia-${index}`} className="rounded-lg border border-gray-100 p-2 bg-gray-50">
+                    {sugerencia}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 no-print">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">Presupuesto sugerido</h2>
@@ -3068,9 +3190,19 @@ export default function App() {
 
               {resumenCierreMes && (
                 <div className="mx-4 mt-4 rounded-lg border border-violet-200 bg-violet-50 p-3">
-                  <div className="text-sm font-semibold text-violet-800">Cierre de mes {resumenCierreMes.mes}</div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-violet-800">Cierre de mes {resumenCierreMes.mes}</div>
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${resumenCierreMes.variacion > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {resumenCierreMes.variacion > 0 ? 'Subió deuda' : 'Deuda controlada'}
+                    </span>
+                  </div>
                   <div className="text-sm text-violet-900 mt-1">
                     Consumo: {formatGs(resumenCierreMes.gastos)} · Pagos: {formatGs(resumenCierreMes.pagos)} · Variación: {formatGs(resumenCierreMes.variacion)}
+                  </div>
+                  <div className="text-sm mt-2 text-violet-900">
+                    Recomendación próxima: {resumenCierreMes.variacion > 0
+                      ? `pagar al menos ${formatGsNoDecimals(Math.ceil(resumenCierreMes.variacion * 1.1))} para bajar la deuda.`
+                      : 'mantener ritmo de pago actual para sostener control.'}
                   </div>
                 </div>
               )}
