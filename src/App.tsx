@@ -1436,6 +1436,28 @@ export default function App() {
     });
   }, [categoriasPresupuesto, movimientosNoAhorro, presupuestoGastosSugeridoTotal]);
 
+  const resumenGastosPorCategoria = useMemo(() => {
+    const acumulado = new Map<string, { nombre: string; total: number }>();
+
+    movimientosNoAhorro
+      .filter((mov) => mov.tipo === 'GASTO')
+      .forEach((mov) => {
+        const key = mov.categoria_id;
+        const nombre = mov.categorias?.nombre ?? 'Sin categoría';
+        const existente = acumulado.get(key);
+
+        if (existente) {
+          acumulado.set(key, { ...existente, total: existente.total + mov.monto });
+        } else {
+          acumulado.set(key, { nombre, total: mov.monto });
+        }
+      });
+
+    return Array.from(acumulado.values())
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8);
+  }, [movimientosNoAhorro]);
+
   const ahora = new Date();
   const finMesActual = endOfMonth(ahora);
   const diasDelMes = finMesActual.getDate();
@@ -2393,13 +2415,67 @@ export default function App() {
 
       {vistaActiva === 'MOVIMIENTOS' && (
         <>
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+          <div className="hidden print:block bg-white p-4 rounded-xl border border-gray-300 print-report">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Reporte financiero mensual</h2>
+                <p className="text-sm text-gray-600 mt-1">Usuario: {authUsuario}</p>
+                <p className="text-xs text-gray-500">Periodo: {fechaInicio} a {fechaFin}</p>
+              </div>
+              <div className="text-xs text-gray-500">Generado: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mt-4 text-sm">
+              <div className="border rounded p-2">
+                <div className="text-gray-500">Ingresos</div>
+                <div className="font-semibold text-emerald-700">{formatGs(ingresos)}</div>
+              </div>
+              <div className="border rounded p-2">
+                <div className="text-gray-500">Gastos totales</div>
+                <div className="font-semibold text-red-700">{formatGs(gastosTotalesConAhorro)}</div>
+              </div>
+              <div className="border rounded p-2">
+                <div className="text-gray-500">Ahorro neto</div>
+                <div className="font-semibold text-sky-700">{formatGs(ahorroAcumulado)}</div>
+              </div>
+              <div className="border rounded p-2">
+                <div className="text-gray-500">Balance final</div>
+                <div className={`font-semibold ${balance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatGs(balance)}</div>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <h3 className="text-sm font-semibold text-gray-800 mb-2">Top gastos por categoría</h3>
+              {resumenGastosPorCategoria.length === 0 ? (
+                <p className="text-xs text-gray-500">Sin gastos en el periodo.</p>
+              ) : (
+                <table className="w-full text-xs border border-gray-300 rounded overflow-hidden">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="text-left px-2 py-1 border-b border-gray-300">Categoría</th>
+                      <th className="text-right px-2 py-1 border-b border-gray-300">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resumenGastosPorCategoria.map((item, index) => (
+                      <tr key={`print-cat-${index}`}>
+                        <td className="px-2 py-1 border-b border-gray-200">{item.nombre}</td>
+                        <td className="px-2 py-1 text-right border-b border-gray-200">{formatGsNoDecimals(item.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 print:hidden">
             <div className="text-sm text-gray-500">Disponible hoy (para comparar con banco)</div>
             <div className="text-4xl font-bold text-blue-700 mt-1">{formatGsNoDecimals(saldoDisponible)}</div>
             <div className="text-xs text-gray-500 mt-2">Este valor ya descuenta tu ahorro neto.</div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <div className="text-gray-500 text-sm mb-1">Ingresos Totales</div>
               <div className="text-2xl font-semibold text-emerald-600">
@@ -2421,7 +2497,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 no-print">
             <div className="lg:col-span-2 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h2 className="text-lg font-semibold">Reporte ejecutivo del balance</h2>
@@ -2539,7 +2615,7 @@ export default function App() {
               )}
             </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:hidden">
             <div className="hidden lg:col-span-1 bg-white p-5 rounded-xl shadow-sm border border-gray-100 no-print">
               <h2 className="text-lg font-semibold mb-4">Nuevo Registro</h2>
               <form onSubmit={guardarMovimiento} className="space-y-4">
