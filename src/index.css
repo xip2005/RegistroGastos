@@ -137,6 +137,11 @@ textarea {
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -153,5 +158,109 @@ textarea {
 
   .print-report {
     page-break-inside: avoid;
+    background: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 10px;
+    padding: 14px;
+  }
+
+  body.dark-mode .print-report,
+  body.dark-mode .print-report * {
+    color: #111827 !important;
+    background: transparent !important;
+    border-color: #d1d5db !important;
+  }
+
+  .print-report__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .print-report__title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .print-report__meta {
+    margin: 2px 0;
+    font-size: 12px;
+    color: #4b5563 !important;
+  }
+
+  .print-report__summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .print-report__item {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px;
+  }
+
+  .print-report__label {
+    font-size: 11px;
+    color: #6b7280 !important;
+  }
+
+  .print-report__value {
+    font-size: 16px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+
+  .print-positive {
+    color: #047857 !important;
+  }
+
+  .print-negative {
+    color: #b91c1c !important;
+  }
+
+  .print-report__block {
+    margin-top: 10px;
+  }
+
+  .print-report__subtitle {
+    margin: 0 0 6px 0;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .print-report__kpis {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .print-report__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .print-report__table th,
+  .print-report__table td {
+    border: 1px solid #d1d5db;
+    padding: 6px;
+    text-align: left;
+  }
+
+  .print-report__table th:last-child,
+  .print-report__table td:last-child {
+    text-align: right;
+  }
+
+  .print-report__footer {
+    margin-top: 10px;
+    font-size: 11px;
+    color: #6b7280 !important;
   }
 }

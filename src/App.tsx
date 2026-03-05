@@ -2231,7 +2231,7 @@ export default function App() {
 
   return (
     <div className="max-w-4xl mx-auto p-3 sm:p-4 md:p-6 space-y-6">
-      <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
+      <header className="print:hidden flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Control de Gastos</h1>
           <div className="text-xs sm:text-sm text-gray-500 mt-1">Sesión: {authUsuario}</div>
@@ -2415,58 +2415,70 @@ export default function App() {
 
       {vistaActiva === 'MOVIMIENTOS' && (
         <>
-          <div className="hidden print:block bg-white p-4 rounded-xl border border-gray-300 print-report">
-            <div className="flex items-start justify-between gap-3">
+          <div className="hidden print:block print-report">
+            <div className="print-report__head">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Reporte financiero mensual</h2>
-                <p className="text-sm text-gray-600 mt-1">Usuario: {authUsuario}</p>
-                <p className="text-xs text-gray-500">Periodo: {fechaInicio} a {fechaFin}</p>
+                <h2 className="print-report__title">Estado de cuenta financiero</h2>
+                <p className="print-report__meta">Usuario: {authUsuario}</p>
+                <p className="print-report__meta">Periodo: {fechaInicio} a {fechaFin}</p>
               </div>
-              <div className="text-xs text-gray-500">Generado: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
+              <div className="print-report__meta">Generado: {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 mt-4 text-sm">
-              <div className="border rounded p-2">
-                <div className="text-gray-500">Ingresos</div>
-                <div className="font-semibold text-emerald-700">{formatGs(ingresos)}</div>
+            <div className="print-report__summary">
+              <div className="print-report__item">
+                <div className="print-report__label">Ingresos</div>
+                <div className="print-report__value print-positive">{formatGs(ingresos)}</div>
               </div>
-              <div className="border rounded p-2">
-                <div className="text-gray-500">Gastos totales</div>
-                <div className="font-semibold text-red-700">{formatGs(gastosTotalesConAhorro)}</div>
+              <div className="print-report__item">
+                <div className="print-report__label">Gastos totales</div>
+                <div className="print-report__value print-negative">{formatGs(gastosTotalesConAhorro)}</div>
               </div>
-              <div className="border rounded p-2">
-                <div className="text-gray-500">Ahorro neto</div>
-                <div className="font-semibold text-sky-700">{formatGs(ahorroAcumulado)}</div>
+              <div className="print-report__item">
+                <div className="print-report__label">Ahorro neto</div>
+                <div className="print-report__value">{formatGs(ahorroAcumulado)}</div>
               </div>
-              <div className="border rounded p-2">
-                <div className="text-gray-500">Balance final</div>
-                <div className={`font-semibold ${balance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatGs(balance)}</div>
+              <div className="print-report__item">
+                <div className="print-report__label">Balance final</div>
+                <div className={`print-report__value ${balance >= 0 ? 'print-positive' : 'print-negative'}`}>{formatGs(balance)}</div>
               </div>
             </div>
 
-            <div className="mt-4">
-              <h3 className="text-sm font-semibold text-gray-800 mb-2">Top gastos por categoría</h3>
+            <div className="print-report__block">
+              <h3 className="print-report__subtitle">Indicadores clave</h3>
+              <div className="print-report__kpis">
+                <div>Gasto/Ingreso: <strong>{formatPercent(ratioGastoIngreso)}</strong></div>
+                <div>Ahorro/Ingreso: <strong>{formatPercent(ratioAhorroIngreso)}</strong></div>
+                <div>Días restantes del mes: <strong>{diasRestantesMes}</strong></div>
+                <div>Proyección de gasto mensual: <strong>{formatGsNoDecimals(proyeccionGastoMes)}</strong></div>
+              </div>
+            </div>
+
+            <div className="print-report__block">
+              <h3 className="print-report__subtitle">Detalle de gastos por categoría</h3>
               {resumenGastosPorCategoria.length === 0 ? (
-                <p className="text-xs text-gray-500">Sin gastos en el periodo.</p>
+                <p className="print-report__meta">Sin gastos en el periodo seleccionado.</p>
               ) : (
-                <table className="w-full text-xs border border-gray-300 rounded overflow-hidden">
-                  <thead className="bg-gray-100">
+                <table className="print-report__table">
+                  <thead>
                     <tr>
-                      <th className="text-left px-2 py-1 border-b border-gray-300">Categoría</th>
-                      <th className="text-right px-2 py-1 border-b border-gray-300">Total</th>
+                      <th>Categoría</th>
+                      <th>Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     {resumenGastosPorCategoria.map((item, index) => (
                       <tr key={`print-cat-${index}`}>
-                        <td className="px-2 py-1 border-b border-gray-200">{item.nombre}</td>
-                        <td className="px-2 py-1 text-right border-b border-gray-200">{formatGsNoDecimals(item.total)}</td>
+                        <td>{item.nombre}</td>
+                        <td>{formatGsNoDecimals(item.total)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )}
             </div>
+
+            <p className="print-report__footer">Documento generado por Control de Gastos.</p>
           </div>
 
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 print:hidden">
