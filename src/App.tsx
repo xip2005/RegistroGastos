@@ -418,6 +418,13 @@ export default function App() {
   const [filtroTipoHistorial, setFiltroTipoHistorial] = useState<FiltroTipoHistorial>('TODOS');
   const [mostrarModalMovimiento, setMostrarModalMovimiento] = useState(false);
   const [mostrarPresupuesto, setMostrarPresupuesto] = useState(false);
+  const [mostrarAnalisisFinanciero, setMostrarAnalisisFinanciero] = useState(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+
+    return window.innerWidth >= 1024;
+  });
   const [mostrarHistorialDetalle, setMostrarHistorialDetalle] = useState(() => {
     if (typeof window === 'undefined') {
       return true;
@@ -2509,7 +2516,17 @@ export default function App() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 no-print">
+          <div className="no-print flex justify-end">
+            <button
+              type="button"
+              onClick={() => setMostrarAnalisisFinanciero((prev) => !prev)}
+              className="px-3 py-2 rounded border border-gray-200 hover:bg-gray-50 text-sm"
+            >
+              {mostrarAnalisisFinanciero ? 'Ocultar análisis' : 'Mostrar análisis'}
+            </button>
+          </div>
+
+          <div className={`${mostrarAnalisisFinanciero ? 'grid' : 'hidden'} grid-cols-1 lg:grid-cols-3 gap-4 no-print`}>
             <div className="lg:col-span-2 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h2 className="text-lg font-semibold">Reporte ejecutivo del balance</h2>
