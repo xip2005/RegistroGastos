@@ -1364,6 +1364,8 @@ export default function App() {
 
   const ingresos = movimientosNoAhorro.filter(m => m.tipo === 'INGRESO').reduce((acc, curr) => acc + curr.monto, 0);
   const gastos = movimientosNoAhorro.filter(m => m.tipo === 'GASTO').reduce((acc, curr) => acc + curr.monto, 0);
+  const cantidadIngresos = movimientosNoAhorro.filter((m) => m.tipo === 'INGRESO').length;
+  const cantidadGastos = movimientosNoAhorro.filter((m) => m.tipo === 'GASTO').length;
   const balance = ingresos - gastos;
   const depositosAhorro = historialAhorro
     .filter((mov) => mov.tipo === 'INGRESO')
@@ -2449,6 +2451,36 @@ export default function App() {
                 <div className="print-report__label">Balance final</div>
                 <div className={`print-report__value ${balance >= 0 ? 'print-positive' : 'print-negative'}`}>{formatGs(balance)}</div>
               </div>
+            </div>
+
+            <div className="print-report__block">
+              <h3 className="print-report__subtitle">Resumen de historial (Gastos e Ingresos)</h3>
+              <table className="print-report__table">
+                <thead>
+                  <tr>
+                    <th>Tipo</th>
+                    <th>Cantidad</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Ingresos</td>
+                    <td>{cantidadIngresos}</td>
+                    <td>{formatGs(ingresos)}</td>
+                  </tr>
+                  <tr>
+                    <td>Gastos</td>
+                    <td>{cantidadGastos}</td>
+                    <td>{formatGs(gastos)}</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Balance</strong></td>
+                    <td><strong>{cantidadIngresos + cantidadGastos}</strong></td>
+                    <td className={balance >= 0 ? 'print-positive' : 'print-negative'}><strong>{formatGs(balance)}</strong></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
             <div className="print-report__block">
